@@ -39,64 +39,67 @@
 
 ```mermaid
 flowchart TD
-    subgraph HARDWARE_LAYER ["1. LỚP PHẦN CỨNG & CẢM BIẾN NGOẠI VI"]
-        LoRaMod["Module LoRa E220-900T30D (LLCC68 UART, 1W)"]
+    subgraph HW ["1. LỚP PHẦN CỨNG VÀ NGOẠI VI"]
+        LoRaMod["Module LoRa E220-900T30D (UART 1W)"]
         SimMod["Module 4G LTE & GPS A7680C (UART2)"]
-        AdcSens["Cảm biến Nguồn PoE (IO35), Pin (IO36) & Temp CPU"]
-        EthWlan["Ethernet LAN8720 / Wi-Fi 802.11 b/g/n RF"]
+        AdcSens["Cảm biến Nguồn PoE, Pin & Temp CPU"]
+        EthWlan["Giao tiếp Ethernet LAN8720 / Wi-Fi RF"]
     end
 
-    subgraph FREERTOS_LAYER ["2. LỚP ĐA NHIỆM FREERTOS (ESP32 DUAL-CORE)"]
-        subgraph CORE0 ["CORE 0 (Mạng & Hạ Tầng Viễn Thông)"]
-            T_NET["Task_Network (Prio 3, 14KB)\nFailover Wi-Fi/ETH + WireGuard VPN"]
-            T_SIM["Task_SIM_A7680C (Prio 2, 6KB)\nQuản lý AT Command + Định vị GPS"]
-            T_CLI["Task_Serial_CLI (Prio 1, 6KB)\nGiao tiếp dòng lệnh kỹ thuật viên"]
-        end
+    subgraph CORE0 ["2. FREERTOS CORE 0 (Mạng & Hạ Tầng)"]
+        T_NET["Task_Network (Prio 3, 14KB) - Failover & WireGuard"]
+        T_SIM["Task_SIM_A7680C (Prio 2, 6KB) - AT Commands & GPS"]
+        T_CLI["Task_Serial_CLI (Prio 1, 6KB) - Console Debugging"]
+    end
 
-        subgraph CORE1 ["CORE 1 (LoRa Radio, Web & Keepalive)"]
-            T_LORA["Task_LoRa_PacketForwarder (Prio 4, 16KB)\nĐọc E220 UART + Forwarder Dispatcher"]
-            T_WEB["Task_WebServer (Prio 2, 14KB)\nAsyncWebServer + LittleFS + REST API"]
-            T_HB["Task_Heartbeat (Prio 2, 6KB)\nChirpStack Stats + Semtech Pull/Push"]
-            T_PWR["Task_Sensor_Power (Prio 1, 6KB)\nLấy mẫu ADC Nguồn + Giám sát Heap"]
-        end
-        
+    subgraph CORE1 ["3. FREERTOS CORE 1 (LoRa Radio & Dịch Vụ)"]
+        T_LORA["Task_LoRa_PacketForwarder (Prio 4, 16KB) - Packet Forwarder"]
+        T_WEB["Task_WebServer (Prio 2, 14KB) - Async Web & REST API"]
+        T_HB["Task_Heartbeat (Prio 2, 6KB) - Stats & Keepalive"]
+        T_PWR["Task_Sensor_Power (Prio 1, 6KB) - ADC & Power Monitor"]
+    end
+
+    subgraph IPC ["4. HÀNG ĐỢI VÀ ĐỒNG BỘ FREERTOS"]
         Q_LORA[("g_loraRxQueue (Queue 20 x 284B)")]
         M_STATE[("g_stateMutex (Recursive Mutex)")]
-        M_UDP[("s_udpMutex (Mutex Socket)")]
+        M_UDP[("s_udpMutex (Mutex Socket UDP)")]
     end
 
-    subgraph CLOUD_LAYER ["3. LỚP DỊCH VỤ MẠNG & CLOUD CLUSTER"]
-        EMQX["EMQX MQTT Broker (192.168.1.140:1883)\nACL: +/gateway/+/..."]
-        ChirpStack["ChirpStack v4 LNS (Region: as923)"]
+    subgraph CLOUD ["5. MÁY CHỦ CLOUD & CLIENT"]
+        EMQX["EMQX MQTT Broker (192.168.1.140:1883)"]
+        ChirpStack["ChirpStack v4 LNS (Region as923)"]
         SemtechUDP["Semtech UDP Network Server (:1700)"]
-        WG_Server["WireGuard Server (VPN Tunnel :51820)"]
+        WG_Server["WireGuard VPN Server (:51820)"]
         Browser["Trình Duyệt Web Client (Dashboard GUI)"]
     end
 
-    LoRaMod -->|UART1 RX:32 TX:33| T_LORA
-    T_LORA -->|Gói tin nhận| Q_LORA
-    Q_LORA -->|Tiêu thụ gói| T_LORA
-    
-    SimMod -->|UART2 RX:16 TX:17| T_SIM
-    AdcSens -->|Analog ADC| T_PWR
-    
-    T_LORA <-->|Cập nhật/Đọc| M_STATE
-    T_NET <-->|Cập nhật/Đọc| M_STATE
-    T_WEB <-->|Cập nhật/Đọc| M_STATE
-    T_HB <-->|Cập nhật/Đọc| M_STATE
-    T_PWR <-->|Cập nhật/Đọc| M_STATE
-    
-    T_LORA -->|as923/gateway/eui/event/up| EMQX
-    T_HB -->|as923/gateway/eui/event/stats| EMQX
-    T_HB -->|as923/gateway/eui/state/conn (Retained/LWT)| EMQX
-    EMQX -->|as923/gateway/eui/command/+| T_LORA
-    EMQX --> ChirpStack
-    
-    T_LORA -->|PKT_PUSH_DATA (rxpk)| SemtechUDP
-    T_HB -->|PKT_PULL_DATA + stat| SemtechUDP
-    
-    T_NET <-->|UDP WireGuard Tunnel| WG_Server
-    T_WEB <-->|HTTP REST / Web GUI| Browser
+    LoRaMod -->|"UART1 RX:32 TX:33"| T_LORA
+    T_LORA -->|"Đẩy gói nhận"| Q_LORA
+    Q_LORA -->|"Xử lý forward"| T_LORA
+    SimMod -->|"UART2 RX:16 TX:17"| T_SIM
+    AdcSens -->|"Lấy mẫu Analog"| T_PWR
+    EthWlan -->|"Link UP/DOWN"| T_NET
+
+    T_LORA ---|"Đồng bộ telemetry"| M_STATE
+    T_NET ---|"Đồng bộ IP/VPN"| M_STATE
+    T_WEB ---|"Đọc trạng thái"| M_STATE
+    T_HB ---|"Đọc số liệu gói"| M_STATE
+    T_PWR ---|"Ghi thông số nguồn"| M_STATE
+
+    T_LORA -->|"Bảo vệ socket"| M_UDP
+    T_HB -->|"Bảo vệ socket"| M_UDP
+
+    T_LORA -->|"as923/gateway/id/event/up"| EMQX
+    T_HB -->|"as923/gateway/id/event/stats"| EMQX
+    T_HB -->|"as923/gateway/id/state/conn (LWT & Retained)"| EMQX
+    EMQX -->|"as923/gateway/id/command/+"| T_LORA
+    EMQX -->|"ChirpStack MQTT API"| ChirpStack
+
+    T_LORA -->|"PKT_PUSH_DATA (rxpk)"| SemtechUDP
+    T_HB -->|"PKT_PULL_DATA + stat"| SemtechUDP
+
+    T_NET ---|"Đường hầm WireGuard (UDP:51820)"| WG_Server
+    Browser -->|"HTTP REST & Web GUI (Port 80)"| T_WEB
 ```
 
 ---
