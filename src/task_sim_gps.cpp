@@ -7,7 +7,6 @@ static const int PIN_SIM_ENABLE = 15; // Kéo HIGH để bật nguồn DC-DC cho
 static const int PIN_SIM_DTR    = 4;  // Kéo LOW để đánh thức module (Sleep/Wake control)
 static const int PIN_SIM_TX     = 17; // ESP32 TXD2 -> Module RX
 static const int PIN_SIM_RX     = 16; // ESP32 RXD2 <- Module TX
-static const int PIN_STATUS_LED = 2;  // LED báo trạng thái
 
 static HardwareSerial SerialSIM(2);
 
@@ -144,12 +143,9 @@ void Task_SIM_A7680C(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(3000));
     Serial.println("[SIM GPS] Khoi tao module 4G SIMCom A7680C...");
 
-    // Cấu hình chân DTR và Status LED
+    // Cấu hình chân DTR
     pinMode(PIN_SIM_DTR, OUTPUT);
     digitalWrite(PIN_SIM_DTR, LOW); // Đánh thức module
-
-    pinMode(PIN_STATUS_LED, OUTPUT);
-    digitalWrite(PIN_STATUS_LED, LOW);
 
     // Kéo chân IO15 lên HIGH để kích hoạt khối nguồn DC-DC cho module 4G
     pinMode(PIN_SIM_ENABLE, OUTPUT);
@@ -231,10 +227,8 @@ void Task_SIM_A7680C(void *pvParameters) {
             char timeStr[24] = {0};
 
             if (parseCGPSINFO(respBuf, lat, lon, alt, timeStr, sizeof(timeStr))) {
-                // Nháy LED trạng thái 50ms báo hiệu đã Fix GPS
-                digitalWrite(PIN_STATUS_LED, HIGH);
-                vTaskDelay(pdMS_TO_TICKS(50));
-                digitalWrite(PIN_STATUS_LED, LOW);
+                // Nháy nhẹ LED trạng thái 50ms báo hiệu đã Fix GPS
+                SystemManager_PulseLed(50);
 
                 withTelemetry([&](GatewayTelemetry &t) {
                     t.simReady = true;

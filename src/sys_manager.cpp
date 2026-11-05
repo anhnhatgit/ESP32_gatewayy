@@ -357,6 +357,17 @@ void SystemManager_Restart(uint32_t delayMs) {
     esp_restart();
 }
 
+void SystemManager_SetLed(bool on) {
+    digitalWrite(PIN_STATUS_LED, on ? HIGH : LOW);
+}
+
+void SystemManager_PulseLed(uint32_t pulseMs) {
+    int cur = digitalRead(PIN_STATUS_LED);
+    digitalWrite(PIN_STATUS_LED, !cur);
+    vTaskDelay(pdMS_TO_TICKS(pulseMs));
+    digitalWrite(PIN_STATUS_LED, cur);
+}
+
 void SystemManager_Init() {
     // Tat tam Brownout Detector de tranh reset khi co sụt áp tức thời
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
@@ -368,6 +379,10 @@ void SystemManager_Init() {
     pinMode(4, INPUT);  // DTR
     pinMode(16, INPUT); // 4G TX -> ESP32 RX
     pinMode(17, INPUT); // ESP32 TX -> 4G RX
+
+    // Cấu hình và bật LED IO2 hiển thị trạng thái hoạt động Gateway (sáng ngay khi cấp nguồn)
+    pinMode(PIN_STATUS_LED, OUTPUT);
+    digitalWrite(PIN_STATUS_LED, HIGH);
 
     Serial.begin(115200);
     delay(200);

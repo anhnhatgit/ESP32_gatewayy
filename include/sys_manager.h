@@ -23,12 +23,17 @@
 #define PRIORITY_SERIAL_CLI    1  
 #define PRIORITY_SENSOR        1  
 
+// Chân LED hiển thị trạng thái hoạt động Gateway (IO2 trên ESP32 / TDM2402)
+#define PIN_STATUS_LED 2
+
 // Public APIs
 void SystemManager_Init();
 void SystemManager_LoadConfig();
 void SystemManager_SaveConfig();
 void SystemManager_ResetDefaults();
 void SystemManager_Restart(uint32_t delayMs = 500);
+void SystemManager_SetLed(bool on);
+void SystemManager_PulseLed(uint32_t pulseMs = 80);
 
 // Task prototypes
 void Task_Network(void *pvParameters);

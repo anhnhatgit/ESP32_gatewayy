@@ -1,11 +1,15 @@
 #include "task_sensor_pwr.h"
+#include "sys_manager.h"
+#include "task_network.h"
 #include <esp_system.h>
 
 void Task_Sensor_Power(void *pvParameters) {
-    Serial.println("[SENSOR Task] Bat dau giam sat nguon va nhiet do...");
+    Serial.println("[SENSOR Task] Bat dau giam sat nguon, nhiet do va dieu khien LED IO2...");
 
     // Cau hinh chan ADC
     analogReadResolution(12);
+
+    static uint8_t s_ledCycle = 0;
 
     for (;;) {
         // 1. Doc nhiet do noi bo ESP32 (Do C)
@@ -41,7 +45,30 @@ void Task_Sensor_Power(void *pvParameters) {
             t.minFreeHeapBytes = esp_get_minimum_free_heap_size();
         });
 
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        // 4. Dieu khien LED IO2 hien thi trang thai hoat dong Gateway:
+        // - Khi Gateway hoat dong va DA CO MANG (Ethernet/Wi-Fi):
+        //   LED sang on dinh, chop nhip tim (Heartbeat 80ms) moi 2 giay de bao he thong ONLINE.
+        // - Khi Gateway hoat dong nhung CHUA CO MANG (Che do AP Hotspot / Dang cho):
+        //   LED chop deu 1s sang / 1s tat (500ms ON / 500ms OFF) bao hieu he thong dang cho uplink.
+        s_ledCycle++;
+        bool netConnected = Network_IsConnected();
+
+        if (netConnected) {
+            if (s_ledCycle % 4 == 0) {
+                // Nhay nhip tim 80ms moi 2 giay
+                digitalWrite(PIN_STATUS_LED, LOW);
+                vTaskDelay(pdMS_TO_TICKS(80));
+                digitalWrite(PIN_STATUS_LED, HIGH);
+                vTaskDelay(pdMS_TO_TICKS(420));
+            } else {
+                digitalWrite(PIN_STATUS_LED, HIGH);
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+        } else {
+            // Chop deu 1 Hz (500ms ON / 500ms OFF)
+            digitalWrite(PIN_STATUS_LED, (s_ledCycle % 2 == 0) ? HIGH : LOW);
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
     }
 }
 

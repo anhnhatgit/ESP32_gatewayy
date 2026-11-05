@@ -123,7 +123,7 @@ Firmware HC001 được tối ưu hóa cho hai nền tảng phần cứng chính
 | | `SIM_DTR` | **IO4** | `INPUT` / `OUTPUT` | Đánh thức module từ chế độ Sleep (Wake/Sleep control) |
 | | `SIM_TX` | **IO17** | `INPUT` (Boot) / `TXD2` | Nối chân **RX** của module A7680C |
 | | `SIM_RX` | **IO16** | `INPUT` (Boot) / `RXD2` | Nối chân **TX** của module A7680C |
-| | `NET_LED` | **IO2** | `OUTPUT` | Đèn LED hiển thị trạng thái kết nối mạng |
+| **Trạng Thái Hệ Thống** | `IO2-LED` (`PIN_STATUS_LED`) | **IO2** | `OUTPUT` | Đèn LED onboard / TDM2402 báo trạng thái: Sáng boot, chớp 1Hz khi chờ mạng/AP, sáng + nhịp tim (Heartbeat 80ms) khi có mạng Online, nhấp nháy khi có gói tin LoRa RX/TX |
 | **Giám Sát Nguồn** | `ADC_POE` | **IO35** | `ADC1_CH7` (Input Only) | Đọc điện áp nguồn PoE 48V qua cầu phân áp (1:15) |
 | | `ADC_BAT` | **IO36** | `ADC1_CH0` (Input Only) | Đọc điện áp pin Lithium 3.7V - 4.2V qua cầu phân áp (1:2) |
 | **Serial CLI** | `UART0_TX` | **IO1** | `UART0_TXD` | Nạp code & Debug Terminal (115200 8N1) |

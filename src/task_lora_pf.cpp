@@ -1,5 +1,6 @@
 #include "task_lora_pf.h"
 #include "task_network.h"
+#include "sys_manager.h"
 #include <WiFiUdp.h>
 #include <WiFiClient.h>
 #include <PubSubClient.h>
@@ -405,6 +406,7 @@ static void mqttCallback(char* topic, byte* message, unsigned int length) {
                 if (rawLen > 0) {
                     Serial.printf("[LoRa TX] Phat Downlink toi thiet bi qua E220 (%u bytes)...\n", (unsigned int)rawLen);
                     LoRa_SendPacket(rawLoRa, rawLen);
+                    digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED)); // Chop LED IO2 khi phat Downlink
                     withTelemetry([&](GatewayTelemetry &t) {
                         t.txPktsCount++;
                     });
@@ -723,6 +725,7 @@ void Task_LoRa_PacketForwarder(void *pvParameters) {
             }
 
             Serial.printf("[E220 RX] Nhan goi tin %u bytes | RSSI: %d dBm\n", (unsigned int)pkt.size, pkt.rssi);
+            digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED)); // Chop LED IO2 khi nhan goi LoRa tu cam bien
 
             // Đưa vào Queue xử lý chung
             if (g_loraRxQueue) {
