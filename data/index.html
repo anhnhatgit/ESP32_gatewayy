@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HC001 Industrial LoRaWAN Gateway - Management Console</title>
+    <link rel="stylesheet" href="style.css?v=2.3.2">
+</head>
+
+<body>
+    <!-- 1. ENTERPRISE LOGIN SCREEN -->
+    <div id="login-screen" class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">
+                    <svg width="140" height="140" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">
+                    <!-- Lớp đế 3D màu xanh đậm phía dưới -->
+                    <rect x="42" y="42" width="122" height="122" rx="16" 
+                            transform="rotate(45 103 103)" 
+                            fill="#082536" />
+
+                    <!-- Hình thoi chính màu xanh Cyan -->
+                    <rect x="39" y="39" width="122" height="122" rx="16" 
+                            transform="rotate(45 100 100)" 
+                            fill="#39f3fc" 
+                            stroke="#082536" 
+                            stroke-width="2" />
+
+                    <!-- Vòng tròn mảnh bên trong -->
+                    <circle cx="100" cy="100" r="56" 
+                            fill="none" 
+                            stroke="#082536" 
+                            stroke-width="1.8" />
+
+                    <!-- Nội dung chữ -->
+                    <g font-family="'Times New Roman', Georgia, serif" fill="#082536" text-anchor="middle">
+                        <text x="100" y="75" font-size="14" font-weight="bold" letter-spacing="0.5">HOLDING</text>
+                        <text x="100" y="109" font-size="44" font-weight="900" letter-spacing="1">HC</text>
+                        <text x="100" y="126" font-size="13.5" font-weight="bold">Technology</text>
+                        <text x="100" y="142" font-size="13.5" font-weight="bold">Solutions</text>
+                    </g>
+                </svg>
+                </div>
+                <h2>HC001</h2>
+                <p>Industrial LoRaWAN Gateway Console</p>
+            </div>
+
+            <form id="form-login" onsubmit="handleLogin(event)" autocomplete="off">
+                <div id="login-error" class="alert-box alert-danger" style="display:none;"></div>
+
+                <div class="form-group">
+                    <label>Tên đăng nhập (Username)</label>
+                    <input type="text" id="login-user" class="form-control" placeholder="Nhập tên đăng nhập" required autocomplete="off" value="">
+                </div>
+
+                <div class="form-group">
+                    <label>Mật khẩu (Password)</label>
+                    <input type="password" id="login-pass" class="form-control" placeholder="Nhập mật khẩu" required autocomplete="new-password" value="">
+                </div>
+
+                <div class="form-check">
+                    <input type="checkbox" id="login-remember">
+                    <label for="login-remember">Duy trì trạng thái đăng nhập</label>
+                </div>
+
+                <button type="submit" id="btn-login-submit" class="btn btn-primary btn-block">Đăng nhập</button>
+            </form>
+
+            <div class="login-footer">
+                <span>Model: <strong>HC001</strong> | Radio: <strong>E220-900T30D (1W)</strong> | FW:
+                    <strong>v2.3.0-PROD</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MAIN GATEWAY APP CONSOLE -->
+    <div id="app-console" class="app-layout" style="display:none;">
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <svg class="header-logo-img" width="140" height="140" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">
+                    <!-- Lớp đế 3D màu xanh đậm phía dưới -->
+                    <rect x="42" y="42" width="122" height="122" rx="16" 
+                            transform="rotate(45 103 103)" 
+                            fill="#082536" />
+
+                    <!-- Hình thoi chính màu xanh Cyan -->
+                    <rect x="39" y="39" width="122" height="122" rx="16" 
+                            transform="rotate(45 100 100)" 
+                            fill="#39f3fc" 
+                            stroke="#082536" 
+                            stroke-width="2" />
+
+                    <!-- Vòng tròn mảnh bên trong -->
+                    <circle cx="100" cy="100" r="56" 
+                            fill="none" 
+                            stroke="#082536" 
+                            stroke-width="1.8" />
+
+                    <!-- Nội dung chữ -->
+                    <g font-family="'Times New Roman', Georgia, serif" fill="#082536" text-anchor="middle">
+                        <text x="100" y="75" font-size="14" font-weight="bold" letter-spacing="0.5">HOLDING</text>
+                        <text x="100" y="109" font-size="44" font-weight="900" letter-spacing="1">HC</text>
+                        <text x="100" y="126" font-size="13.5" font-weight="bold">Technology</text>
+                        <text x="100" y="142" font-size="13.5" font-weight="bold">Solutions</text>
+                    </g>
+                </svg>
+                </div>
+                <div class="brand-info">
+                    <h2>HC001</h2>
+                    <span class="subtext">LoRaWAN Gateway</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#overview" class="nav-item active" onclick="switchTab('overview')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>
+                    </span>
+                    <span class="nav-label">Trạng thái tổng quan</span>
+                </a>
+                <a href="#wifi-setup" class="nav-item" onclick="switchTab('wifi-setup')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><circle cx="12" cy="20" r="1" fill="currentColor"></circle></svg>
+                    </span>
+                    <span class="nav-label">Cấu hình Wi-Fi & Mạng</span>
+                </a>
+
+                <a href="#wireguard" class="nav-item" onclick="switchTab('wireguard')">
+
+                    <span class="nav-icon">
+
+                        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+
+                    </span>
+
+                    <span class="nav-label">WireGuard VPN</span>
+
+                </a>
+                <a href="#lora-e220" class="nav-item" onclick="switchTab('lora-e220')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48 0a6 6 0 0 1 0-8.49"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"></path></svg>
+                    </span>
+                    <span class="nav-label">LoRa E220-900T30D</span>
+                </a>
+                <a href="#mqtt-fwd" class="nav-item" onclick="switchTab('mqtt-fwd')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path><polyline points="12 11 12 17"></polyline><polyline points="9 14 12 11 15 14"></polyline></svg>
+                    </span>
+                    <span class="nav-label">MQTT Forwarder</span>
+                </a>
+                <a href="#udp-fwd" class="nav-item" onclick="switchTab('udp-fwd')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    </span>
+                    <span class="nav-label">Semtech UDP Forwarder</span>
+                </a>
+                <a href="#sensors" class="nav-item" onclick="switchTab('sensors')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+                    </span>
+                    <span class="nav-label">Cảm biến Milesight</span>
+                </a>
+                <a href="#maintenance" class="nav-item" onclick="switchTab('maintenance')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </span>
+                    <span class="nav-label">Bảo trì & Cập nhật OTA</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sys-health">
+                    <span class="status-indicator-dot online"></span>
+                    <span id="footer-net-state">Đang tải...</span>
+                </div>
+                <div class="sys-version">Firmware: v2.3.0-PROD (E220-900T30D)</div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Topbar Bar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1 id="page-title">Trạng thái tổng quan</h1>
+                    <div class="topbar-meta">
+                        <span class="meta-item">Gateway ID (EUI): <code id="hdr-gateway-eui">--</code> <button
+                                class="btn-copy" onclick="copyEUI()" title="Sao chép EUI"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></span>
+                        <span class="meta-sep">|</span>
+                        <span class="meta-item">IP: <strong id="hdr-active-ip">--</strong></span>
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    <div class="status-pill" id="pill-net-mode">
+                        <span class="pill-dot"></span>
+                        <span id="pill-net-text">Loading...</span>
+                    </div>
+
+                    <button class="btn btn-sm btn-outline-danger" onclick="rebootGateway()" title="Khởi động lại ESP32"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>Khởi động lại</button>
+
+                    <div class="user-menu">
+                        <span class="user-badge"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><span id="current-username">admin</span></span>
+                        <button class="btn btn-sm btn-outline" onclick="handleLogout()" title="Đăng xuất">Đăng xuất</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Notification Toast Container -->
+            <div id="toast-container" class="toast-container"></div>
+
+            <!-- Body Content Tabs -->
+            <div class="content-body">
+                <!-- ==================== TAB 1: OVERVIEW ==================== -->
+                <section id="tab-overview" class="tab-pane active">
+                    <!-- Metric Cards Grid -->
+                    <div class="grid grid-4">
+                        <div class="card metric-card">
+                            <div class="metric-header">
+                                <span class="metric-title">Gói tin LoRa RX (E220)</span>
+                                <span class="metric-badge info" id="badge-e220-status">E220 Ready</span>
+                            </div>
+                            <div class="metric-value" id="val-rx-count">0</div>
+                            <div class="metric-footer">
+                                <span>Tần số: <strong id="val-e220-freq">921.125 MHz</strong></span>
+                                <span id="val-last-rssi">RSSI: -- dBm</span>
+                            </div>
+                        </div>
+
+                        <div class="card metric-card">
+                            <div class="metric-header">
+                                <span class="metric-title">Chuyển tiếp Cloud</span>
+                                <span class="metric-badge success" id="badge-fwd-type">UDP & MQTT</span>
+                            </div>
+                            <div class="metric-value" id="val-fwd-count">0</div>
+                            <div class="metric-footer">
+                                <span>MQTT: <strong id="val-mqtt-status">Tắt</strong></span>
+                                <span>UDP: <strong id="val-udp-status">Bật</strong></span>
+                            </div>
+                        </div>
+
+                        <div class="card metric-card">
+                            <div class="metric-header">
+                                <span class="metric-title">Nguồn cấp thiết bị</span>
+                                <span class="metric-badge" id="badge-pwr">PoE 48V</span>
+                            </div>
+                            <div class="metric-value" id="val-pwr-source">PoE Active</div>
+                            <div class="metric-footer">
+                                <span id="val-pwr-detail">Điện áp: 48.0 V</span>
+                            </div>
+                        </div>
+
+                        <div class="card metric-card">
+                            <div class="metric-header">
+                                <span class="metric-title">Nhiệt độ & Bộ nhớ</span>
+                                <span class="metric-badge warning">ESP32-S3</span>
+                            </div>
+                            <div class="metric-value" id="val-chip-temp">-- °C</div>
+                            <div class="metric-footer">
+                                <span id="val-free-heap">RAM trống: --</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Information Table Card -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>Thông số phần cứng Gateway HC001 & Định danh Gateway ID</h3>
+                            <button class="btn btn-sm btn-outline" onclick="fetchStatus()">Làm mới</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="grid grid-2">
+                                <table class="info-table">
+                                    <tr>
+                                        <td>Mã thiết bị (Model)</td>
+                                        <td><strong>HC001 Industrial LoRaWAN Gateway</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Module LoRa Radio</td>
+                                        <td><strong style="color:var(--primary)">Ebyte E220-900T30D (LLCC68 - 1W/30dBm)</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Phiên bản Firmware</td>
+                                        <td><code>v2.3.0-PROD (Dual OTA Flash)</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Thời gian hoạt động (Uptime)</td>
+                                        <td id="val-uptime">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Gateway ID (EUI)</td>
+                                        <td>
+                                            <div style="display:flex; align-items:center; gap:8px;">
+                                                <input type="text" id="val-table-eui" class="form-control font-mono" style="max-width:220px;" maxlength="16">
+                                                <button class="btn btn-sm btn-primary" onclick="saveGatewayEUI()" title="Lưu Gateway ID">Lưu</button>
+                                                <button class="btn btn-sm btn-secondary" onclick="generateGatewayEUI()" title="Tự sinh Gateway ID từ địa chỉ MAC">Tự sinh từ MAC</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <table class="info-table">
+                                    <tr>
+                                        <td>Chế độ mạng ưu tiên</td>
+                                        <td id="val-active-iface">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Địa chỉ IP nội bộ (LAN)</td>
+                                        <td><strong id="val-table-lan-ip">--</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Cấu hình IP Station</td>
+                                        <td id="val-table-ip-type">DHCP</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Hotspot AP dự phòng</td>
+                                        <td id="val-table-ap-info">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Cường độ sóng Wi-Fi (RSSI)</td>
+                                        <td id="val-table-wifi-rssi">--</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td>WireGuard VPN</td>
+                                        <td id="val-table-wg-status">Tắt</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Định vị GPS (SIM A7680C)</td>
+                                        <td id="val-table-gps-status"><span class="badge badge-secondary">Đang khởi động...</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Packet Inspector -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>Theo dõi gói tin LoRa E220 & Cảm biến Milesight Thời gian thực</h3>
+                            <div class="card-actions">
+                                <button class="btn btn-sm btn-primary" onclick="injectTestPacket()" title="Bơm gói tin Heartbeat mẫu (single-log.json) lên EMQX & ChirpStack">Bơm gói tin mẫu (single-log.json)</button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Thời gian</th>
+                                            <th>Thiết bị (DevEUI)</th>
+                                            <th>Chủng loại cảm biến</th>
+                                            <th>Dữ liệu đã giải mã (Decoded TLV)</th>
+                                            <th>Tín hiệu (RSSI/SNR)</th>
+                                            <th>Payload HEX</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="live-packets-body">
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">Đang đợi gói tin từ module E220-900T30D...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 2: WI-FI SETUP & STATIC IP ==================== -->
+                <section id="tab-wifi-setup" class="tab-pane">
+                    <div id="banner-network-mode" class="banner-status"></div>
+
+                    <div class="grid grid-2 mt-4">
+                        <!-- Wi-Fi Site Survey -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Dò quét mạng Wi-Fi lân cận (Site Survey)</h3>
+                                <button id="btn-scan-wifi" class="btn btn-sm btn-secondary" onclick="scanWifiNetworks()">Dò quét Wi-Fi</button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="wifi-scan-container" class="wifi-scan-list">
+                                    <div class="p-4 text-center text-muted">
+                                        Nhấn nút <strong>"Quét mạng Wi-Fi"</strong> để tìm kiếm các mạng khả dụng xung quanh Gateway.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Wi-Fi Station & Static IP Form -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Cài đặt kết nối Wi-Fi & Cấu hình IP tĩnh (Static IP)</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="form-wifi-connect" onsubmit="handleWifiConnect(event)">
+                                    <div class="form-group">
+                                        <label>Tên mạng Wi-Fi (SSID)</label>
+                                        <input type="text" id="cfg-wifi-ssid" class="form-control" placeholder="Chọn từ danh sách quét hoặc nhập tay" required>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Mật khẩu Wi-Fi</label>
+                                        <div class="input-password-wrapper">
+                                            <input type="password" id="cfg-wifi-pass" class="form-control" placeholder="Nhập mật khẩu Wi-Fi (nếu có)">
+                                            <button type="button" class="btn-toggle-eye" onclick="togglePassVisibility('cfg-wifi-pass')" title="Hiện/ẩn mật khẩu"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-check mt-3 mb-2">
+                                        <input type="checkbox" id="cfg-wifi-static" onchange="toggleStaticIpFields()">
+                                        <label for="cfg-wifi-static"><strong>Sử dụng IP tĩnh (Static IP) thay vì DHCP</strong></label>
+                                    </div>
+
+                                    <div id="box-static-ip" style="display:none; padding:12px; background:var(--bg-surface-alt); border-radius:var(--radius-sm); border:1px solid var(--border-color); margin-bottom:14px;">
+                                        <div class="form-group">
+                                            <label>Địa chỉ IP tĩnh (Static IP)</label>
+                                            <input type="text" id="cfg-wifi-ip" class="form-control font-mono" placeholder="192.168.1.180">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Mặt nạ mạng (Subnet Mask)</label>
+                                            <input type="text" id="cfg-wifi-subnet" class="form-control font-mono" placeholder="255.255.255.0">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Cổng mặc định (Gateway IP)</label>
+                                            <input type="text" id="cfg-wifi-gw" class="form-control font-mono" placeholder="192.168.1.1">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Máy chủ DNS (DNS Server)</label>
+                                            <input type="text" id="cfg-wifi-dns" class="form-control font-mono" placeholder="8.8.8.8">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-actions mt-3">
+                                        <button type="submit" id="btn-connect-wifi" class="btn btn-primary btn-block">Lưu & Kết nối Wi-Fi</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hotspot AP Card -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>Cấu hình Trạm phát Hotspot (Access Point Dự phòng)</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="grid grid-2">
+                                <div class="form-group">
+                                    <label>Tên Hotspot (AP SSID)</label>
+                                    <input type="text" id="cfg-ap-ssid" class="form-control" readonly>
+                                    <small class="text-muted">Được tạo tự động theo địa chỉ MAC của phần cứng HC001</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Mật khẩu Hotspot</label>
+                                    <input type="text" id="cfg-ap-pass" class="form-control" readonly value="12345678">
+                                    <small class="text-muted">Mặc định: 12345678 | IP cấu hình trực tiếp: 192.168.4.1</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+
+                <!-- ==================== TAB: WIREGUARD VPN ==================== -->
+
+                <section id="tab-wireguard" class="tab-pane">
+
+                    <div class="card">
+
+                        <div class="card-header">
+
+                            <h3>Cấu hình WireGuard VPN Client (Bảo mật mạng & Quản trị từ xa)</h3>
+
+                            <button class="btn btn-sm btn-primary" onclick="saveWireGuardConfig()">Lưu cấu hình WireGuard</button>
+
+                        </div>
+
+                        <div class="card-body">
+
+                            <div class="alert-box" style="background:#e0f2fe; color:#0369a1; border-color:#bae6fd; margin-bottom:20px;">
+
+                                WireGuard VPN thiết lập đường hầm mã hóa an toàn giữa Gateway HC001 và hệ thống điều hành trung tâm, cho phép theo dõi và gửi dữ liệu từ xa mà không phụ thuộc vào IP tĩnh hoặc NAT router.
+
+                            </div>
+
+
+
+                            <div class="form-check" style="margin-bottom:20px;">
+
+                                <input type="checkbox" id="cfg-wg-enable">
+
+                                <label for="cfg-wg-enable"><strong>Bật kết nối WireGuard VPN</strong></label>
+
+                            </div>
+
+
+
+                            <div class="grid grid-2">
+
+                                <div class="form-group">
+
+                                    <label>Địa chỉ IP VPN Gateway (Local IP)</label>
+
+                                    <input type="text" id="cfg-wg-local-ip" class="form-control font-mono" placeholder="10.0.0.2" value="10.0.0.2">
+
+                                    <small class="text-muted">Địa chỉ IP được cấp trong mạng riêng ảo VPN</small>
+
+                                </div>
+
+
+
+                                <div class="form-group">
+
+                                    <label>Subnet Mask VPN</label>
+
+                                    <input type="text" id="cfg-wg-subnet" class="form-control font-mono" placeholder="255.255.255.0" value="255.255.255.0">
+
+                                </div>
+
+
+
+                                <div class="form-group">
+
+                                    <label>Gateway IP VPN</label>
+
+                                    <input type="text" id="cfg-wg-gateway" class="form-control font-mono" placeholder="10.0.0.1" value="10.0.0.1">
+
+                                </div>
+
+
+
+                                <div class="form-group">
+
+                                    <label>Địa chỉ Máy chủ VPN (Endpoint Address)</label>
+
+                                    <input type="text" id="cfg-wg-endpoint" class="form-control font-mono" placeholder="vpn.example.com hoặc IP Public">
+
+                                    <small class="text-muted">Domain hoặc IP máy chủ WireGuard</small>
+
+                                </div>
+
+
+
+                                <div class="form-group">
+
+                                    <label>Cổng Máy chủ (Endpoint Port)</label>
+
+                                    <input type="number" id="cfg-wg-port" class="form-control font-mono" placeholder="51820" value="51820">
+
+                                    <small class="text-muted">Mặc định 51820 (UDP)</small>
+
+                                </div>
+
+
+
+                                <div class="form-group">
+
+                                    <label>Trạng thái kết nối VPN</label>
+
+                                    <div style="padding-top:8px;">
+
+                                        <span id="disp-wg-status" class="badge badge-secondary">Đã tắt</span>
+
+                                    </div>
+
+                                </div>
+
+
+
+                                <div class="form-group" style="grid-column: span 2;">
+
+                                    <label>Private Key của Gateway (Base64 - 44 ký tự)</label>
+
+                                    <input type="password" id="cfg-wg-private-key" class="form-control font-mono" placeholder="Khóa riêng tư Base64 của Gateway">
+
+                                    <small class="text-muted">Khóa bí mật dùng để xác thực và mã hóa Curve25519</small>
+
+                                </div>
+
+
+
+                                <div class="form-group" style="grid-column: span 2;">
+
+                                    <label>Public Key của Máy chủ (Peer Public Key)</label>
+
+                                    <input type="text" id="cfg-wg-peer-public-key" class="form-control font-mono" placeholder="Khóa công khai Base64 của máy chủ WireGuard">
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+
+                <!-- ==================== TAB 3: LORA E220-900T30D CONFIGURATION ==================== -->
+                <section id="tab-lora-e220" class="tab-pane">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Cấu hình Thu/Phát LoRa Ebyte E220-900T30D (Công suất 1W / 30dBm)</h3>
+                            <button class="btn btn-sm btn-primary" onclick="saveE220Config()">Áp dụng lên E220</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="grid grid-2">
+                                <div class="form-group">
+                                    <label>Kênh tần số (Channel: 0 - 80)</label>
+                                    <div style="display:flex; gap:10px; align-items:center;">
+                                        <input type="number" id="cfg-e220-channel" class="form-control" min="0" max="80" value="71" oninput="updateE220FreqDisplay()">
+                                        <span style="font-weight:700; color:var(--primary); min-width:130px;" id="disp-e220-freq">921.125 MHz</span>
+                                    </div>
+                                    <small class="text-muted">Công thức E220: Tần số = 850.125 + Kênh x 1.0 MHz (Kênh 71 = 921.125 MHz AS923)</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Tốc độ truyền vô tuyến (Air Data Rate)</label>
+                                    <select id="cfg-e220-air-rate" class="form-control">
+                                        <option value="0">2.4 kbps (SF11 - Khoảng cách cực xa)</option>
+                                        <option value="1">2.4 kbps (Standard)</option>
+                                        <option value="2" selected>2.4 kbps (Mặc định chuẩn)</option>
+                                        <option value="3">4.8 kbps (SF10)</option>
+                                        <option value="4">9.6 kbps (SF9)</option>
+                                        <option value="5">19.2 kbps (SF8 - Tốc độ cao)</option>
+                                        <option value="6">38.4 kbps (SF7)</option>
+                                        <option value="7">62.5 kbps (SF6 - Tối đa)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Công suất phát vô tuyến (TX Power)</label>
+                                    <select id="cfg-e220-tx-power" class="form-control">
+                                        <option value="0" selected>30 dBm (1.0 Watt - Tối đa 10km)</option>
+                                        <option value="1">27 dBm (500 mW)</option>
+                                        <option value="2">24 dBm (250 mW)</option>
+                                        <option value="3">21 dBm (125 mW - Tiết kiệm điện)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Tốc độ Baud UART (Giao tiếp ESP32)</label>
+                                    <select id="cfg-e220-baud" class="form-control">
+                                        <option value="9600" selected>9600 bps (Khuyên dùng)</option>
+                                        <option value="19200">19200 bps</option>
+                                        <option value="38400">38400 bps</option>
+                                        <option value="57600">57600 bps</option>
+                                        <option value="115200">115200 bps</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Địa chỉ Module (Address: 0x0000 - 0xFFFF)</label>
+                                    <input type="number" id="cfg-e220-address" class="form-control font-mono" value="0" min="0" max="65535">
+                                    <small class="text-muted">Đặt 0 cho chế độ Broadcast/Transparent</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Mã mạng (Network ID: 0x00 - 0xFF)</label>
+                                    <input type="number" id="cfg-e220-netid" class="form-control font-mono" value="0" min="0" max="255">
+                                </div>
+                            </div>
+
+                            <div class="form-check mt-3">
+                                <input type="checkbox" id="cfg-e220-enable-rssi" checked>
+                                <label for="cfg-e220-enable-rssi"><strong>Bật tự động gắn byte RSSI vào cuối mỗi gói tin nhận được</strong></label>
+                            </div>
+
+                            <hr class="divider-line">
+                            <h4 style="font-size:13.5px; margin-bottom:12px; color:var(--text-secondary);">Cấu hình chân đấu nối GPIO giữa ESP32-S3 và E220-900T30D:</h4>
+                            <div class="grid grid-4">
+                                <div class="form-group">
+                                    <label>Chân RX (ESP32 RX <- TXD E220)</label>
+                                    <input type="number" id="cfg-pin-rx" class="form-control font-mono" value="32">
+                                </div>
+                                <div class="form-group">
+                                    <label>Chân TX (ESP32 TX -> RXD E220)</label>
+                                    <input type="number" id="cfg-pin-tx" class="form-control font-mono" value="33">
+                                </div>
+                                <div class="form-group">
+                                    <label>Chân AUX (Busy/Ready)</label>
+                                    <input type="number" id="cfg-pin-aux" class="form-control font-mono" value="14">
+                                </div>
+                                <div class="form-group">
+                                    <label>Chân M0 / M1 (Mode Switch)</label>
+                                    <div style="display:flex; gap:6px;">
+                                        <input type="number" id="cfg-pin-m0" class="form-control font-mono" value="25" placeholder="M0">
+                                        <input type="number" id="cfg-pin-m1" class="form-control font-mono" value="26" placeholder="M1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 4: MQTT FORWARDER CONFIGURATION ==================== -->
+                <section id="tab-mqtt-fwd" class="tab-pane">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Cấu hình MQTT Forwarder (EMQX Broker &gt; ChirpStack v4)</h3>
+                            <button class="btn btn-sm btn-primary" onclick="saveMqttConfig()">Lưu cấu hình MQTT</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert-box mb-4" style="background:#f0fafb; border:1px solid #99dfe3; color:#006b72; padding:12px 16px; border-radius:6px; font-size:13px; line-height:1.5;">
+                                <strong>Kiến trúc luồng dữ liệu:</strong> Cảm biến LoRa &rarr; Gateway HC001 (E220-900T30D) &rarr; EMQX MQTT Broker &rarr; ChirpStack v4 Network Server.<br>
+                                <span>Định dạng gói tin tương thích chuẩn LoRaWAN, ChirpStack MQTT Forwarder và mẫu <code>single-log.json</code>.</span>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input type="checkbox" id="cfg-mqtt-enable">
+                                <label for="cfg-mqtt-enable"><strong>Kích hoạt dịch vụ MQTT Forwarder</strong></label>
+                            </div>
+
+                            <div class="grid grid-2">
+                                <div class="form-group">
+                                    <label>Địa chỉ MQTT Broker (EMQX Server)</label>
+                                    <input type="text" id="cfg-mqtt-server" class="form-control" placeholder="broker.emqx.io hoặc IP Server EMQX">
+                                    <small class="text-muted">EMQX Broker trung gian tiếp nhận dữ liệu từ Gateway</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Cổng MQTT (Port)</label>
+                                    <input type="number" id="cfg-mqtt-port" class="form-control" value="1883">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Mã định danh Client ID</label>
+                                    <input type="text" id="cfg-mqtt-client-id" class="form-control font-mono" placeholder="HC001_Gateway">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Tên đăng nhập (Username - Tùy chọn)</label>
+                                    <input type="text" id="cfg-mqtt-user" class="form-control" placeholder="Để trống nếu EMQX cho phép Anonymous">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Mật khẩu (Password - Tùy chọn)</label>
+                                    <input type="password" id="cfg-mqtt-pass" class="form-control" placeholder="Nhập mật khẩu EMQX Broker">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Topic Uplink (Gửi dữ liệu Cảm biến lên ChirpStack)</label>
+                                    <input type="text" id="cfg-mqtt-uplink" class="form-control font-mono" value="as923_2/gateway/%s/event/up">
+                                    <small class="text-muted">ChirpStack v4 chuẩn: as923_2/gateway/%s/event/up (%s tự động thay bằng Gateway ID)</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Topic Heartbeat / Thống kê Gateway (ChirpStack Stats)</label>
+                                    <input type="text" id="cfg-mqtt-heartbeat" class="form-control font-mono" value="as923_2/gateway/%s/event/stats">
+                                    <small class="text-muted">Định kỳ gửi thống kê Heartbeat để ChirpStack nhận diện Gateway Hoạt động (Active)</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Topic Downlink (Nhận lệnh từ ChirpStack phát xuống Cảm biến)</label>
+                                    <input type="text" id="cfg-mqtt-downlink" class="form-control font-mono" value="as923_2/gateway/%s/command/down">
+                                    <small class="text-muted">Bất kỳ lệnh downlink nào từ ChirpStack sẽ được Gateway phát qua LoRa E220</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 5: SEMTECH UDP FORWARDER ==================== -->
+                <section id="tab-udp-fwd" class="tab-pane">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Cấu hình Semtech UDP Packet Forwarder v2</h3>
+                            <button class="btn btn-sm btn-primary" onclick="saveUdpConfig()">Lưu cấu hình UDP</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check mb-3">
+                                <input type="checkbox" id="cfg-udp-enable" checked>
+                                <label for="cfg-udp-enable"><strong>Kích hoạt dịch vụ Semtech UDP Forwarder</strong></label>
+                            </div>
+
+                            <div class="grid grid-2">
+                                <div class="form-group">
+                                    <label>Địa chỉ Server (LoRaWAN Network Server)</label>
+                                    <input type="text" id="cfg-server-addr" class="form-control" value="eu1.cloud.thethings.network">
+                                    <small class="text-muted">The Things Network (TTN), ChirpStack, Milesight Cloud, AWS IoT...</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Cổng Server (UDP Port)</label>
+                                    <input type="number" id="cfg-server-port" class="form-control" value="1700">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Chu kỳ gửi Heartbeat Keepalive (Giây)</label>
+                                    <input type="number" id="cfg-heartbeat-sec" class="form-control" value="60" min="10" max="3600">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 6: SENSORS MANAGEMENT ==================== -->
+                <section id="tab-sensors" class="tab-pane">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Danh mục Cảm biến Milesight IoT đã đồng bộ</h3>
+                            <button class="btn btn-sm btn-outline" onclick="loadSensors()">Làm mới</button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tên cảm biến</th>
+                                            <th>Mã DevEUI</th>
+                                            <th>Model</th>
+                                            <th>Trạng thái</th>
+                                            <th>Thông số đo gần nhất</th>
+                                            <th>Pin</th>
+                                            <th>Tín hiệu</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sensors-table-body">
+                                        <!-- Loaded by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 7: MAINTENANCE & OTA & BACKUP ==================== -->
+                <section id="tab-maintenance" class="tab-pane">
+                    <div class="grid grid-2">
+                        <!-- OTA Firmware Update Card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Cập nhật Firmware qua Web (OTA Update)</h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-secondary mb-3">
+                                    Nạp file nhị phân <code>firmware.bin</code> trực tiếp từ trình duyệt mà không cần cắm cáp USB.
+                                </p>
+                                <form id="form-ota-upload" onsubmit="handleOtaUpload(event)">
+                                    <div class="form-group">
+                                        <label>Chọn file firmware (.bin)</label>
+                                        <input type="file" id="ota-file" class="form-control" accept=".bin" required>
+                                    </div>
+
+                                    <div id="ota-progress-box" style="display:none; margin:14px 0;">
+                                        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                                            <span id="ota-status-text">Đang nạp firmware...</span>
+                                            <span id="ota-percent-text">0%</span>
+                                        </div>
+                                        <div style="width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                                            <div id="ota-progress-bar" style="width:0%; height:100%; background:var(--primary); transition:width 0.2s;"></div>
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" id="btn-ota-submit" class="btn btn-primary mt-2">Bắt đầu nạp OTA</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Backup & Restore Configuration Card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Sao lưu & Khôi phục Cấu hình Flash (Backup / Restore)</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="action-row">
+                                    <div>
+                                        <strong>Sao lưu cấu hình (Backup)</strong>
+                                        <p class="text-secondary">Xuất toàn bộ cấu hình Wi-Fi, E220 LoRa, MQTT, UDP ra file JSON.</p>
+                                    </div>
+                                    <a href="/api/system/backup_config" class="btn btn-secondary">Tải file sao lưu (.json)</a>
+                                </div>
+
+                                <hr class="divider-line">
+
+                                <div>
+                                    <strong>Khôi phục cấu hình (Restore)</strong>
+                                    <p class="text-secondary mb-2">Nạp lại cấu hình từ file backup JSON đã lưu trước đó.</p>
+                                    <div style="display:flex; gap:10px;">
+                                        <input type="file" id="restore-file" class="form-control" accept=".json">
+                                        <button class="btn btn-primary" onclick="handleRestoreConfig()">Khôi phục cấu hình</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Change Password Card -->
+                        <div class="card mt-4">
+                            <div class="card-header">
+                                <h3>Đổi mật khẩu tài khoản quản trị (admin)</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="form-change-password" onsubmit="handleChangePassword(event)">
+                                    <div class="form-group">
+                                        <label>Mật khẩu hiện tại</label>
+                                        <input type="password" id="pwd-old" class="form-control" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Mật khẩu mới</label>
+                                        <input type="password" id="pwd-new" class="form-control" minlength="4" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Nhập lại mật khẩu mới</label>
+                                        <input type="password" id="pwd-confirm" class="form-control" minlength="4" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary mt-2">Cập nhật mật khẩu</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Reboot & Factory Reset Card -->
+                        <div class="card mt-4">
+                            <div class="card-header">
+                                <h3>Khởi động lại & Xuất xưởng</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="action-row">
+                                    <div>
+                                        <strong>Khởi động lại Gateway (Reboot)</strong>
+                                        <p class="text-secondary">Khởi động lại ESP32-S3 và reset module LoRa E220.</p>
+                                    </div>
+                                    <button class="btn btn-danger" onclick="rebootGateway()">Khởi động lại</button>
+                                </div>
+
+                                <hr class="divider-line">
+
+                                <div class="action-row">
+                                    <div>
+                                        <strong>Khôi phục cài đặt gốc (Factory Reset)</strong>
+                                        <p class="text-secondary">Xóa bộ nhớ NVS và đưa các tham số về mặc định ban đầu.</p>
+                                    </div>
+                                    <button class="btn btn-outline-danger" onclick="resetDefaults()">Khôi phục gốc</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- 3. CONNECTION PROGRESS MODAL -->
+    <div id="modal-connecting" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-spinner"></div>
+            <h3 id="modal-title">Đang kết nối tới Wi-Fi...</h3>
+            <p id="modal-desc" class="text-secondary">Vui lòng chờ Gateway nhận IP từ bộ định tuyến (Router)...</p>
+            <div id="modal-success-box" class="modal-success-box" style="display:none;">
+                <div class="success-icon">✓</div>
+                <h4>Kết nối Wi-Fi thành công!</h4>
+                <p>Địa chỉ mạng LAN mới của Gateway:</p>
+                <div class="new-ip-badge"><a id="modal-lan-url" href="#" target="_blank">http://...</a></div>
+                <p class="text-muted text-sm mt-2">Bạn có thể kết nối điện thoại/laptop vào mạng Wi-Fi đó và truy cập đường link trên.</p>
+                <button class="btn btn-primary mt-3" onclick="closeModal()">Đã hiểu & Tiếp tục</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. REBOOT COUNTDOWN MODAL -->
+    <div id="modal-reboot" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-spinner"></div>
+            <h3>Gateway đang khởi động lại...</h3>
+            <p class="text-secondary mt-2">Hệ thống đang nạp lại các dịch vụ vi điều khiển và module E220-900T30D.</p>
+            <div style="font-size:28px; font-weight:700; color:var(--primary); margin:18px 0;" id="reboot-countdown">10</div>
+            <p class="text-muted text-sm">Trình duyệt sẽ tự động kết nối lại ngay khi Gateway hoàn tất khởi động.</p>
+        </div>
+    </div>
+
+    <script src="app.js?v=2.3.1"></script>
+</body>
+
+</html>

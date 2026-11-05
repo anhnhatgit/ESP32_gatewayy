@@ -1,0 +1,59 @@
+{
+    "phy_payload": {
+        "mhdr": {
+            "f_type": "UnconfirmedDataUp",
+            "major": "LoRaWANR1"
+        },
+        "payload": {
+            "fhdr": {
+                "devaddr": "01e6af2d",
+                "f_ctrl": {
+                    "adr": true,
+                    "adr_ack_req": true,
+                    "ack": false,
+                    "f_pending": false,
+                    "class_b": false,
+                    "f_opts_len": 0
+                },
+                "f_cnt": 34375,
+                "f_opts": []
+            },
+            "f_port": 5,
+            "frm_payload": "2ca13f3cb7f8cd94c6a64f997810fdbfbee391d20ff8bcbacff0ae1e703c607b1c6936a2626ef8b96c8559b1cccafbdd7f757c1a09d5445dfebd2c02b58f5669de6adbf41f12773de68aa529a7e6c4c08040a4f2d93595db4e1733b1f7f767725a4e2652add7ee3927"
+        },
+        "mic": [
+            199,
+            236,
+            116,
+            55
+        ]
+    },
+    "tx_info": {
+        "frequency": 923400000,
+        "modulation": {
+            "lora": {
+                "bandwidth": 125000,
+                "spreadingFactor": 8,
+                "codeRate": "CR_4_5"
+            }
+        }
+    },
+    "rx_info": [
+        {
+            "gatewayId": "24e124fffef95df0",
+            "uplinkId": 27783,
+            "gwTime": "2026-11-04T03:49:26.370917+00:00",
+            "nsTime": "2026-11-04T03:49:26.450965748+00:00",
+            "timeSinceGpsEpoch": "1477799384.370s",
+            "rssi": -55,
+            "snr": 15,
+            "channel": 1,
+            "location": {
+                "latitude": 10.841760317588946,
+                "longitude": 106.71543882818438
+            },
+            "context": "FAru6A==",
+            "crcStatus": "CRC_OK"
+        }
+    ]
+}
