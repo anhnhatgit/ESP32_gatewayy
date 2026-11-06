@@ -245,6 +245,10 @@ void SystemManager_ResetDefaults() {
     g_config.wgEndpointPort = 51820;
     memset(g_config.wgPeerPublicKey, 0, sizeof(g_config.wgPeerPublicKey));
 
+    // Cấu hình Gateway Mesh trong suốt (Mặc định: ROOT Gateway)
+    g_config.meshEnable = true;
+    g_config.meshRole = MESH_ROLE_ROOT;
+
     // Cai dat san cam bien mau Heartbeat (theo single-log.json)
     g_config.sensorCount = 2;
     strncpy(g_config.sensors[0].devEUI, "01E6AF2D", sizeof(g_config.sensors[0].devEUI) - 1);
@@ -341,6 +345,12 @@ void SystemManager_LoadConfig() {
             g_config.wgEndpointPort = 51820;
             SystemManager_SaveConfig();
         }
+        // Gia tri mac dinh cho Gateway Mesh trong suot
+        if (g_config.meshRole > 2) {
+            g_config.meshEnable = true;
+            g_config.meshRole = MESH_ROLE_ROOT;
+            SystemManager_SaveConfig();
+        }
     }
 }
 
@@ -401,6 +411,10 @@ void SystemManager_Init() {
     Serial.printf("[SYS] Gateway EUI : %s\n", g_config.gatewayEUI);
     Serial.printf("[SYS] Hotspot AP  : %s (Pass: %s)\n", g_config.apSSID, g_config.apPassword);
     Serial.printf("[SYS] LoRa Channel: %lu Hz (AS923-2), SF%u\n", (unsigned long)g_config.loraFreq, g_config.loraSf);
+    const char* meshRoleNames[] = {"Standalone (Standard)", "Root (Border Gateway)", "Relay (Satellite Gateway)"};
+    Serial.printf("[SYS] Gateway Mesh: %s (Role: %s)\n", 
+                  g_config.meshEnable ? "BAT" : "TAT", 
+                  meshRoleNames[g_config.meshRole <= 2 ? g_config.meshRole : 0]);
 
     // Trì hoãn 500ms cho các tụ lọc nguồn (Bulk Capacitors) trên kit TDM2402 nạp đầy điện thế 3.3V trước khi bật RF
     delay(500);

@@ -348,7 +348,39 @@ Giao diện Web của HC001 được xây dựng theo kiến trúc Single Page A
 
 ---
 
-## 12. Giao Diện Dòng Lệnh Serial CLI
+## 12. Kiến Trúc Gateway Mesh Trong Suốt (HC-Mesh Protocol)
+
+### Bài Toán Thực Tế
+Trong các khu vực nông trại rộng lớn, nhà xưởng hoặc vùng rừng núi xa xôi:
+* Cước phí thuê bao SIM 4G duy trì hàng tháng cho từng Gateway đơn lẻ rất tốn kém.
+* Các trạm vệ tinh ở xa gặp khó khăn trong việc kéo dây mạng LAN hoặc cấp nguồn công suất lớn cho module 4G.
+
+Gateway HC001 tích hợp sẵn giải pháp **Gateway Mesh Trong Suốt (Transparent Mesh)** dựa trên module vô tuyến Ebyte E220-900T30D công suất cực lớn 30 dBm (1.000 mW):
+
+```mermaid
+flowchart TD
+    S["Cảm biến LoRaWAN<br/>(14dBm / AS923)"] -->|"LoRa ngắn (1km)"| RELAY["<b>Relay Gateway (Trạm Vệ Tinh)</b><br/>• Không cần SIM 4G / Không cần Internet<br/>• Đóng gói Mesh Magic Byte 0xFE"]
+    RELAY ==>|"LoRa Mesh 1W (3~8km)"| ROOT["<b>Root Gateway (Trạm Gốc)</b><br/>• Kit TDM2402 có SIM 4G / Wi-Fi / WireGuard<br/>• Bóc tách Mesh & Chống trùng lặp (Dedup)"]
+    ROOT -->|"MQTT: as923/gateway/Relay_EUI/event/up"| CS["<b>ChirpStack v4</b><br/>(Relay Gateway hiện Online & hiển thị đúng Frame)"]
+```
+
+### Đặc Điểm Vận Hành & Khung Truyền Mesh (Frame Format)
+1. **Khung truyền Mesh vô tuyến (Over-The-Air Frame):**
+   * Byte 0: `0xFE` (Magic Byte phân biệt gói tin Mesh với gói cảm biến tiêu chuẩn `0x40`/`0x80`).
+   * Byte 1: `0x01` (Gói Uplink) hoặc `0x02` (Gói Heartbeat báo sống).
+   * Byte 2..9: `Relay Gateway EUI` (8 bytes MAC).
+   * Byte 10..11: `Packet ID / Seq` (Khử trùng lặp tại trạm Root).
+   * Byte 12..13: `RSSI & SNR` đo được tại trạm Relay.
+   * Byte 14: `Hop Count` (Số bước nhảy).
+   * Byte 15..N: `Original Sensor Raw Payload` (Giữ nguyên vẹn mã hóa và CRC gốc).
+2. **Cơ chế Chuyển tiếp trong suốt (Transparent Forwarding tại Root):**
+   * Trạm Root khi nhận được gói `0xFE` sẽ bóc tách `Relay Gateway EUI` và đẩy thẳng lên MQTT topic:
+     `as923/gateway/<relay_eui_lower>/event/up`
+   * **Hiển thị trên ChirpStack:** ChirpStack Server coi như gói tin được thu trực tiếp từ chính trạm Relay đó, hiển thị đúng Gateway ID, trạng thái Online, RSSI và SNR thực tế tại hiện trường.
+
+---
+
+## 13. Giao Diện Dòng Lệnh Serial CLI
 
 Kỹ thuật viên có thể cắm cáp USB-C vào cổng Serial của ESP32 (115200 bps, 8N1) để thao tác cấu hình trực tiếp thông qua các tập lệnh:
 
@@ -371,7 +403,7 @@ Kỹ thuật viên có thể cắm cáp USB-C vào cổng Serial của ESP32 (11
 
 ---
 
-## 13. Hướng Dẫn Biên Dịch & Nạp Firmware
+## 14. Hướng Dẫn Biên Dịch & Nạp Firmware
 
 ### Yêu Cầu Môi Trường
 * **VS Code** cài đặt extension **PlatformIO IDE** (hoặc PlatformIO Core CLI trên Terminal).

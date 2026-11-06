@@ -104,10 +104,12 @@ void WebServer_RegisterRoutes() {
         doc["e220_freq"] = 850.125f + (float)g_config.e220Channel;
         doc["e220_tx_power"] = (g_config.e220TxPower == 0 ? "30 dBm (1W)" : (g_config.e220TxPower == 1 ? "27 dBm" : (g_config.e220TxPower == 2 ? "24 dBm" : "21 dBm")));
 
-        // Trạng thái Forwarders & VPN
+        // Trạng thái Forwarders & VPN & Mesh
         doc["mqtt_enable"] = g_config.mqttEnable;
         doc["udp_enable"] = g_config.udpEnable;
         doc["wg_enable"] = g_config.wgEnable;
+        doc["mesh_enable"] = g_config.meshEnable;
+        doc["mesh_role"] = (int)g_config.meshRole;
 
         withTelemetry([&](const GatewayTelemetry &t) {
             doc["uptime"] = t.uptimeSec;
@@ -125,6 +127,8 @@ void WebServer_RegisterRoutes() {
             doc["rx_count"] = t.rxPktsCount;
             doc["tx_count"] = t.txPktsCount;
             doc["fwd_count"] = t.fwdPktsCount;
+            doc["mesh_rx_count"] = t.meshRxCount;
+            doc["mesh_tx_count"] = t.meshTxCount;
             doc["last_rssi"] = t.lastRSSI;
             doc["last_snr"] = t.lastSNR;
 
@@ -153,6 +157,21 @@ void WebServer_RegisterRoutes() {
                 p["summary"] = t.livePackets[i].decodedSummary;
                 p["rssi"] = t.livePackets[i].rssi;
                 p["snr"] = t.livePackets[i].snr;
+            }
+
+            // Danh sách các trạm Relay trong mạng Mesh (Mesh Topology)
+            JsonArray meshNodes = doc["mesh_nodes"].to<JsonArray>();
+            uint32_t nowSec = millis() / 1000;
+            for (int i = 0; i < t.meshNodeCount; i++) {
+                JsonObject m = meshNodes.add<JsonObject>();
+                m["eui"] = t.meshNodes[i].eui;
+                m["rssi"] = t.meshNodes[i].lastRssi;
+                m["snr"] = t.meshNodes[i].lastSnr;
+                m["ago_sec"] = (nowSec >= t.meshNodes[i].lastSeenSec) ? (nowSec - t.meshNodes[i].lastSeenSec) : 0;
+                m["pkts"] = t.meshNodes[i].packetCount;
+                m["temp"] = t.meshNodes[i].chipTemp;
+                m["pwr"] = t.meshNodes[i].pwrSource;
+                m["online"] = (nowSec - t.meshNodes[i].lastSeenSec < 120);
             }
         });
 
@@ -219,6 +238,10 @@ void WebServer_RegisterRoutes() {
         doc["wgEndpointAddress"] = g_config.wgEndpointAddress;
         doc["wgEndpointPort"] = g_config.wgEndpointPort;
         doc["wgPeerPublicKey"] = g_config.wgPeerPublicKey;
+
+        // Gateway Mesh
+        doc["meshEnable"] = g_config.meshEnable;
+        doc["meshRole"] = (int)g_config.meshRole;
 
         String res;
         serializeJson(doc, res);
@@ -299,6 +322,10 @@ void WebServer_RegisterRoutes() {
             if (doc["wgEndpointAddress"].is<const char*>()) strncpy(g_config.wgEndpointAddress, doc["wgEndpointAddress"], sizeof(g_config.wgEndpointAddress) - 1);
             if (doc["wgEndpointPort"].is<uint16_t>()) g_config.wgEndpointPort = doc["wgEndpointPort"];
             if (doc["wgPeerPublicKey"].is<const char*>()) strncpy(g_config.wgPeerPublicKey, doc["wgPeerPublicKey"], sizeof(g_config.wgPeerPublicKey) - 1);
+
+            // Gateway Mesh
+            if (doc["meshEnable"].is<bool>()) g_config.meshEnable = doc["meshEnable"];
+            if (doc["meshRole"].is<uint8_t>()) g_config.meshRole = doc["meshRole"];
 
             SystemManager_SaveConfig();
 

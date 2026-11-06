@@ -671,6 +671,51 @@ code, pre, .font-mono {
     border: 1px solid var(--success-border);
 }
 
+.badge-warning {
+    background-color: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning-border);
+}
+
+.badge-danger {
+    background-color: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+}
+
+.badge-info {
+    background-color: var(--info-bg);
+    color: var(--info);
+    border: 1px solid var(--info-border);
+}
+
+.badge-secondary {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+}
+
+.link-meter-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 140px;
+}
+
+.link-meter-bar {
+    flex: 1;
+    height: 8px;
+    background-color: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.link-meter-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
 /* ====================================================================
    6. WI-FI ONBOARDING & DYNAMIC BANNER
    ==================================================================== */

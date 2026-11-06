@@ -427,6 +427,10 @@ static void mqttCallback(char* topic, byte* message, unsigned int length) {
 }
 
 static void checkMqttConnection() {
+    // Trạm Relay hoạt động hoàn toàn bằng sóng vô tuyến Mesh, không kết nối MQTT trực tiếp
+    if (g_config.meshEnable && g_config.meshRole == MESH_ROLE_RELAY) {
+        return;
+    }
     if (!g_config.mqttEnable || !Network_IsConnected()) {
         return;
     }
@@ -471,10 +475,14 @@ static void checkMqttConnection() {
                 mqttClient.publish(connTopic, onlineJson, true);
                 Serial.printf("[MQTT State] Da gui trang thai ONLINE (retained) toi %s\n", connTopic);
 
-                // 2. Subscribe DUY NHẤT một wildcard topic command/+ theo chuẩn ChirpStack Gateway OS
-                // Khớp chính xác EMQX ACL: +/gateway/+/command/#
+                // 2. Subscribe wildcard topic command/+ theo chuẩn ChirpStack Gateway OS
+                // Nếu là Root Gateway trong mạng Mesh: Subscribe '+' để nhận command cho toàn bộ Gateway Mesh
                 char cmdTopic[80];
-                snprintf(cmdTopic, sizeof(cmdTopic), "%s/gateway/%s/command/+", prefix.c_str(), euiLower);
+                if (g_config.meshEnable && g_config.meshRole == MESH_ROLE_ROOT) {
+                    snprintf(cmdTopic, sizeof(cmdTopic), "%s/gateway/+/command/+", prefix.c_str());
+                } else {
+                    snprintf(cmdTopic, sizeof(cmdTopic), "%s/gateway/%s/command/+", prefix.c_str(), euiLower);
+                }
                 bool subOk = mqttClient.subscribe(cmdTopic);
                 Serial.printf("[MQTT Sub] Subscribe wildcard topic: %s (%s)\n", cmdTopic, subOk ? "OK" : "FAILED");
             } else {
@@ -553,6 +561,251 @@ static void forwardPacketToMqtt(const LoRaRxPacket &pkt) {
 
     Serial.printf("[MQTT Uplink] Da publish LoRaWAN frame toi ChirpStack: %s (%s, %u bytes)\n",
                   upTopic, pubOk ? "OK" : "FAILED", (unsigned int)jsonStr.length());
+}
+
+// ====================================================================
+// 2.2. GIAO THỨC GATEWAY MESH TRONG SUỐT (HC-MESH TRANSPARENT PROTOCOL)
+// ====================================================================
+struct MeshDedupEntry {
+    char relayEui[17];
+    uint16_t packetId;
+    uint32_t timestampMs;
+};
+static MeshDedupEntry s_meshDedup[32];
+static uint8_t s_meshDedupIdx = 0;
+
+static bool isMeshDuplicate(const char* relayEui, uint16_t packetId) {
+    uint32_t now = millis();
+    for (int i = 0; i < 32; i++) {
+        if (s_meshDedup[i].packetId == packetId && 
+            strncmp(s_meshDedup[i].relayEui, relayEui, 16) == 0 &&
+            (now - s_meshDedup[i].timestampMs < 6000)) {
+            return true;
+        }
+    }
+    strncpy(s_meshDedup[s_meshDedupIdx].relayEui, relayEui, 16);
+    s_meshDedup[s_meshDedupIdx].relayEui[16] = '\0';
+    s_meshDedup[s_meshDedupIdx].packetId = packetId;
+    s_meshDedup[s_meshDedupIdx].timestampMs = now;
+    s_meshDedupIdx = (s_meshDedupIdx + 1) % 32;
+    return false;
+}
+
+// Cập nhật danh sách các trạm Relay trong bảng Mesh Topology tại trạm Root
+static void updateMeshNodeTopology(const char* relayEui, int16_t rssi, float snr, float chipTemp, uint8_t pwr) {
+    withTelemetry([&](GatewayTelemetry &t) {
+        uint32_t nowSec = millis() / 1000;
+        int foundIdx = -1;
+        for (int i = 0; i < t.meshNodeCount; i++) {
+            if (strcasecmp(t.meshNodes[i].eui, relayEui) == 0) {
+                foundIdx = i;
+                break;
+            }
+        }
+        if (foundIdx >= 0) {
+            t.meshNodes[foundIdx].lastRssi = rssi;
+            t.meshNodes[foundIdx].lastSnr = snr;
+            t.meshNodes[foundIdx].lastSeenSec = nowSec;
+            t.meshNodes[foundIdx].packetCount++;
+            if (chipTemp > 0.0f) t.meshNodes[foundIdx].chipTemp = chipTemp;
+            if (pwr > 0) t.meshNodes[foundIdx].pwrSource = pwr;
+            t.meshNodes[foundIdx].isOnline = true;
+        } else if (t.meshNodeCount < MAX_MESH_NODES) {
+            int newIdx = t.meshNodeCount++;
+            strncpy(t.meshNodes[newIdx].eui, relayEui, 16);
+            t.meshNodes[newIdx].eui[16] = '\0';
+            t.meshNodes[newIdx].lastRssi = rssi;
+            t.meshNodes[newIdx].lastSnr = snr;
+            t.meshNodes[newIdx].lastSeenSec = nowSec;
+            t.meshNodes[newIdx].packetCount = 1;
+            t.meshNodes[newIdx].chipTemp = chipTemp > 0.0f ? chipTemp : 35.0f;
+            t.meshNodes[newIdx].pwrSource = pwr > 0 ? pwr : 4; // USB 5V
+            t.meshNodes[newIdx].isOnline = true;
+        }
+    });
+}
+
+// Chuyển tiếp trong suốt gói tin LoRaWAN Uplink từ Relay Gateway lên ChirpStack v4
+static void forwardTransparentMeshPacketToMqtt(const LoRaRxPacket &pkt, const char* relayEuiLower) {
+    if (!g_config.mqttEnable || !mqttClient.connected()) return;
+
+    String prefix = getMqttPrefix();
+
+    uint32_t freqHz = 923400000;
+    if (g_config.e220Channel > 0 && g_config.e220Channel != 71) {
+        freqHz = (uint32_t)((850.125f + (float)g_config.e220Channel) * 1000000.0f);
+    }
+
+    char isoTime[36];
+    time_t now = time(nullptr);
+    if (now > 1600000000) {
+        struct tm timeinfo;
+        gmtime_r(&now, &timeinfo);
+        strftime(isoTime, sizeof(isoTime), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    } else {
+        snprintf(isoTime, sizeof(isoTime), "2026-11-05T02:20:00Z");
+    }
+
+    JsonDocument doc;
+    doc["phyPayload"] = toBase64(pkt.payload, pkt.size);
+
+    JsonObject txInfo = doc["txInfo"].to<JsonObject>();
+    txInfo["frequency"] = freqHz;
+    JsonObject mod = txInfo["modulation"]["lora"].to<JsonObject>();
+    mod["bandwidth"] = 125000;
+    mod["spreadingFactor"] = (g_config.loraSf > 0) ? g_config.loraSf : 7;
+    mod["codeRate"] = "CR_4_5";
+
+    // rxInfo mang định danh của chính trạm RELAY đã thu sóng từ cảm biến
+    JsonObject rxInfo = doc["rxInfo"].to<JsonObject>();
+    rxInfo["gatewayId"] = relayEuiLower;
+    rxInfo["uplinkId"] = (uint32_t)random(1000, 65535);
+    rxInfo["time"] = isoTime;
+    rxInfo["rssi"] = pkt.rssi;
+    rxInfo["snr"] = pkt.snr;
+    rxInfo["channel"] = 1;
+    rxInfo["context"] = "FAru6A==";
+    rxInfo["crcStatus"] = "CRC_OK";
+
+    String jsonStr;
+    serializeJson(doc, jsonStr);
+
+    char upTopic[80];
+    snprintf(upTopic, sizeof(upTopic), "%s/gateway/%s/event/up", prefix.c_str(), relayEuiLower);
+    bool pubOk = mqttClient.publish(upTopic, jsonStr.c_str());
+
+    Serial.printf("[MESH ROOT] Da chuyen tiep trong suot LoRa frame tu Relay (%s) toi ChirpStack: %s (%s, %u bytes)\n",
+                  relayEuiLower, upTopic, pubOk ? "OK" : "FAILED", (unsigned int)jsonStr.length());
+}
+
+// Thay mặt Relay Gateway gửi Heartbeat và trạng thái ONLINE lên ChirpStack
+static void forwardMeshHeartbeatToMqtt(const char* relayEuiLower, float chipTemp, uint8_t pwrSrc) {
+    if (!g_config.mqttEnable || !mqttClient.connected()) return;
+
+    String prefix = getMqttPrefix();
+
+    // 1. Trạng thái ONLINE kèm cờ retained
+    char connTopic[80];
+    snprintf(connTopic, sizeof(connTopic), "%s/gateway/%s/state/conn", prefix.c_str(), relayEuiLower);
+    char connJson[80];
+    snprintf(connJson, sizeof(connJson), "{\"gatewayId\":\"%s\",\"state\":\"ONLINE\"}", relayEuiLower);
+    mqttClient.publish(connTopic, connJson, true);
+
+    // 2. Bản tin gw.GatewayStats cho Relay
+    char isoTime[36];
+    time_t now = time(nullptr);
+    if (now > 1600000000) {
+        struct tm timeinfo;
+        gmtime_r(&now, &timeinfo);
+        strftime(isoTime, sizeof(isoTime), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    } else {
+        snprintf(isoTime, sizeof(isoTime), "2026-11-05T02:20:00Z");
+    }
+
+    JsonDocument statsDoc;
+    statsDoc["gatewayId"] = relayEuiLower;
+    statsDoc["time"] = isoTime;
+    statsDoc["rxPacketsReceived"] = 1;
+    statsDoc["rxPacketsReceivedOk"] = 1;
+    statsDoc["txPacketsReceived"] = 0;
+    statsDoc["txPacketsEmitted"] = 0;
+
+    JsonObject rxPerFreq = statsDoc["rxPacketsPerFrequency"].to<JsonObject>();
+    rxPerFreq["921125000"] = 1;
+
+    JsonObject txPerFreq = statsDoc["txPacketsPerFrequency"].to<JsonObject>();
+    txPerFreq["921125000"] = 0;
+
+    JsonArray rxMod = statsDoc["rxPacketsPerModulation"].to<JsonArray>();
+    JsonObject rxM = rxMod.add<JsonObject>();
+    JsonObject rxModLora = rxM["modulation"]["lora"].to<JsonObject>();
+    rxModLora["bandwidth"] = 125000;
+    rxModLora["spreadingFactor"] = 7;
+    rxModLora["codeRate"] = "CR_4_5";
+    rxM["count"] = 1;
+
+    JsonArray txMod = statsDoc["txPacketsPerModulation"].to<JsonArray>();
+    JsonObject txM = txMod.add<JsonObject>();
+    JsonObject txModLora = txM["modulation"]["lora"].to<JsonObject>();
+    txModLora["bandwidth"] = 125000;
+    txModLora["spreadingFactor"] = 7;
+    txModLora["codeRate"] = "CR_4_5";
+    txModLora["polarizationInversion"] = true;
+    txM["count"] = 0;
+
+    JsonObject txStatus = statsDoc["txPacketsPerStatus"].to<JsonObject>();
+    txStatus["OK"] = 0;
+
+    String statsStr;
+    serializeJson(statsDoc, statsStr);
+
+    char statsTopic[80];
+    snprintf(statsTopic, sizeof(statsTopic), "%s/gateway/%s/event/stats", prefix.c_str(), relayEuiLower);
+    mqttClient.publish(statsTopic, statsStr.c_str());
+
+    Serial.printf("[MESH ROOT] Relay %s bao song (Temp: %.1f C, Pwr: %u). Da publish ONLINE & Stats len ChirpStack!\n",
+                  relayEuiLower, chipTemp, pwrSrc);
+}
+
+// Đóng gói và phát gói tin Mesh từ Relay Gateway về Root Gateway qua E220 1W
+static void relayForwardMeshPacket(const LoRaRxPacket &pkt) {
+    uint8_t meshBuffer[256];
+    meshBuffer[0] = MESH_MAGIC_BYTE; // 0xFE
+    meshBuffer[1] = MESH_MSG_UPLINK;  // Gói tin Uplink từ cảm biến
+
+    // 8 bytes EUI trạm Relay
+    parseEUI(g_config.gatewayEUI, &meshBuffer[2]);
+
+    // 2 bytes Packet ID
+    static uint16_t s_meshSeq = 1;
+    uint16_t seq = s_meshSeq++;
+    meshBuffer[10] = (uint8_t)(seq >> 8);
+    meshBuffer[11] = (uint8_t)(seq & 0xFF);
+
+    // 1 byte RSSI, 1 byte SNR
+    meshBuffer[12] = (int8_t)constrain(pkt.rssi, -128, 127);
+    meshBuffer[13] = (int8_t)constrain((int)pkt.snr, -128, 127);
+
+    // 1 byte Hop count = 1
+    meshBuffer[14] = 1;
+
+    // Payload cảm biến
+    size_t copyLen = pkt.size;
+    if (15 + copyLen > sizeof(meshBuffer)) copyLen = sizeof(meshBuffer) - 15;
+    memcpy(&meshBuffer[15], pkt.payload, copyLen);
+    size_t totalLen = 15 + copyLen;
+
+    // Ngẫu nhiên backoff 40-90ms chống va chạm sóng RF
+    vTaskDelay(pdMS_TO_TICKS(random(40, 90)));
+
+    LoRa_SendPacket(meshBuffer, totalLen);
+    digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED));
+
+    withTelemetry([&](GatewayTelemetry &t) {
+        t.meshTxCount++;
+        t.txPktsCount++;
+    });
+
+    Serial.printf("[MESH RELAY] Da dong goi & phat LoRa 1W ve Root | Seq: %u | Sensor: %u bytes\n",
+                  seq, (unsigned int)copyLen);
+}
+
+// Phát Heartbeat từ Relay Gateway về Root Gateway qua E220 1W
+static void relaySendMeshHeartbeat() {
+    uint8_t hbPkt[16];
+    hbPkt[0] = MESH_MAGIC_BYTE;    // 0xFE
+    hbPkt[1] = MESH_MSG_HEARTBEAT; // 0x02
+    parseEUI(g_config.gatewayEUI, &hbPkt[2]); // 8 bytes EUI
+    hbPkt[10] = (uint8_t)constrain((int)temperatureRead(), 0, 100);
+    hbPkt[11] = (uint8_t)g_telemetry.currentPowerSource;
+
+    LoRa_SendPacket(hbPkt, 12);
+    digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED));
+
+    withTelemetry([&](GatewayTelemetry &t) {
+        t.meshTxCount++;
+    });
+    Serial.printf("[MESH RELAY] Da phat Heartbeat LoRa 1W ve Root Gateway (EUI: %s)\n", g_config.gatewayEUI);
 }
 
 // ====================================================================
@@ -743,24 +996,90 @@ void Task_LoRa_PacketForwarder(void *pvParameters) {
                 t.lastSNR = rxPacket.snr;
             });
 
-            // 1. Giải mã telemetry cảm biến Milesight
-            parseMilesightPayload(rxPacket.payload, rxPacket.size, rxPacket.devEUI, rxPacket.rssi, rxPacket.snr);
-
-            // 2. Chuyển tiếp tới Cloud nếu có kết nối mạng
-            if (Network_IsConnected()) {
-                // Forward qua Semtech UDP
-                if (g_config.udpEnable) {
-                    forwardRxPacketUDP(rxPacket);
+            // A. NẾU LÀ TRẠM RELAY VỆ TINH:
+            if (g_config.meshEnable && g_config.meshRole == MESH_ROLE_RELAY) {
+                // Chỉ chuyển tiếp các gói tin trực tiếp từ cảm biến (byte đầu không phải MESH_MAGIC_BYTE)
+                if (rxPacket.size > 0 && rxPacket.payload[0] != MESH_MAGIC_BYTE) {
+                    relayForwardMeshPacket(rxPacket);
                 }
+            }
+            // B. NẾU LÀ TRẠM ROOT (BORDER GATEWAY) HOẶC STANDALONE:
+            else {
+                // Kiểm tra xem có phải gói tin Mesh do trạm Relay gửi về hay không?
+                if (g_config.meshEnable && g_config.meshRole == MESH_ROLE_ROOT &&
+                    rxPacket.size >= 12 && rxPacket.payload[0] == MESH_MAGIC_BYTE) {
 
-                // Forward qua MQTT Broker
-                if (g_config.mqttEnable) {
-                    forwardPacketToMqtt(rxPacket);
+                    uint8_t msgType = rxPacket.payload[1];
+                    char relayEuiLower[17] = {0};
+                    for (int i = 0; i < 8; i++) {
+                        sprintf(&relayEuiLower[i * 2], "%02x", rxPacket.payload[2 + i]);
+                    }
+                    relayEuiLower[16] = '\0';
+
+                    if (msgType == MESH_MSG_UPLINK && rxPacket.size >= 15) {
+                        uint16_t packetId = ((uint16_t)rxPacket.payload[10] << 8) | rxPacket.payload[11];
+                        // Cập nhật trạm Relay vào bảng Mesh Topology của Root
+                        updateMeshNodeTopology(relayEuiLower, rxPacket.rssi, rxPacket.snr, 0.0f, 0);
+
+                        if (!isMeshDuplicate(relayEuiLower, packetId)) {
+                            LoRaRxPacket relayedPkt;
+                            relayedPkt.size = rxPacket.size - 15;
+                            memcpy(relayedPkt.payload, &rxPacket.payload[15], relayedPkt.size);
+                            relayedPkt.rssi = (int8_t)rxPacket.payload[12];
+                            relayedPkt.snr = (float)((int8_t)rxPacket.payload[13]);
+                            relayedPkt.timestampMs = rxPacket.timestampMs;
+                            strncpy(relayedPkt.devEUI, rxPacket.devEUI, sizeof(relayedPkt.devEUI));
+
+                            withTelemetry([&](GatewayTelemetry &t) {
+                                t.meshRxCount++;
+                                t.fwdPktsCount++;
+                            });
+
+                            // Giải mã telemetry Milesight
+                            parseMilesightPayload(relayedPkt.payload, relayedPkt.size, relayedPkt.devEUI, relayedPkt.rssi, relayedPkt.snr);
+
+                            // Chuyển tiếp trong suốt lên MQTT ChirpStack
+                            if (Network_IsConnected() && g_config.mqttEnable) {
+                                forwardTransparentMeshPacketToMqtt(relayedPkt, relayEuiLower);
+                            }
+                        } else {
+                            Serial.printf("[MESH ROOT] Bo qua goi tin trung lap tu Relay %s (Seq: %u)\n", relayEuiLower, packetId);
+                        }
+                    } else if (msgType == MESH_MSG_HEARTBEAT) {
+                        float temp = (float)rxPacket.payload[10];
+                        uint8_t pwr = rxPacket.payload[11];
+                        // Cập nhật trạm Relay vào bảng Mesh Topology của Root kèm nhiệt độ và nguồn
+                        updateMeshNodeTopology(relayEuiLower, rxPacket.rssi, rxPacket.snr, temp, pwr);
+
+                        withTelemetry([&](GatewayTelemetry &t) {
+                            t.meshRxCount++;
+                        });
+                        if (Network_IsConnected() && g_config.mqttEnable) {
+                            forwardMeshHeartbeatToMqtt(relayEuiLower, temp, pwr);
+                        }
+                    }
+                } else {
+                    // Gói tin chuẩn từ cảm biến xung quanh trạm Root / Standalone:
+                    // 1. Giải mã telemetry cảm biến Milesight
+                    parseMilesightPayload(rxPacket.payload, rxPacket.size, rxPacket.devEUI, rxPacket.rssi, rxPacket.snr);
+
+                    // 2. Chuyển tiếp tới Cloud nếu có kết nối mạng
+                    if (Network_IsConnected()) {
+                        // Forward qua Semtech UDP
+                        if (g_config.udpEnable) {
+                            forwardRxPacketUDP(rxPacket);
+                        }
+
+                        // Forward qua MQTT Broker
+                        if (g_config.mqttEnable) {
+                            forwardPacketToMqtt(rxPacket);
+                        }
+
+                        withTelemetry([&](GatewayTelemetry &t) {
+                            t.fwdPktsCount++;
+                        });
+                    }
                 }
-
-                withTelemetry([&](GatewayTelemetry &t) {
-                    t.fwdPktsCount++;
-                });
             }
         }
 
@@ -780,6 +1099,15 @@ void Task_Heartbeat(void *pvParameters) {
     static uint16_t s_autoFCnt = 34375;
 
     for (;;) {
+        // NẾU LÀ TRẠM RELAY: Hoạt động không cần Internet, phát Heartbeat qua sóng LoRa E220 1W
+        if (g_config.meshEnable && g_config.meshRole == MESH_ROLE_RELAY) {
+            uint32_t interval = g_config.heartbeatIntervalSec;
+            if (interval < 30) interval = 30; // 30s-60s
+            vTaskDelay(pdMS_TO_TICKS(interval * 1000));
+            relaySendMeshHeartbeat();
+            continue;
+        }
+
         if (firstRun) {
             // Chờ mạng kết nối lần đầu tiên thay vì phải đợi hết 30s
             while (!Network_IsConnected()) {

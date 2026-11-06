@@ -47,6 +47,33 @@ enum PowerSource {
     PWR_USB_5V     // Cấp nguồn qua cổng USB Type-C (5V) / Header +5V
 };
 
+// ==========================================
+// ĐỊNH DANH GIAO THỨC MESH TRONG SUỐT (HC-MESH)
+// ==========================================
+#define MESH_MAGIC_BYTE       0xFE
+#define MESH_MSG_UPLINK       0x01
+#define MESH_MSG_HEARTBEAT    0x02
+
+enum GatewayMeshRole {
+    MESH_ROLE_STANDALONE = 0, // Chế độ độc lập (Gateway thông thường, không Mesh)
+    MESH_ROLE_ROOT       = 1, // Trạm Gốc (Border Gateway - có 4G/LAN đẩy lên ChirpStack)
+    MESH_ROLE_RELAY      = 2  // Trạm Vệ Tinh (Relay Gateway - không cần Internet)
+};
+
+#define MAX_MESH_NODES        16
+
+// Cấu trúc theo dõi trạng thái trạm vệ tinh trong mạng Mesh
+struct MeshNodeInfo {
+    char eui[17];            // 16 ký tự Hex EUI của trạm Relay
+    int16_t lastRssi;        // Cường độ sóng P2P giữa Root và Relay (dBm)
+    float lastSnr;           // SNR (dB)
+    uint32_t lastSeenSec;    // Thời điểm thấy gần nhất (uptime giây)
+    uint32_t packetCount;    // Tổng số gói tin đã nhận từ trạm này
+    float chipTemp;          // Nhiệt độ chip Relay (°C)
+    uint8_t pwrSource;       // Nguồn cấp của trạm Relay
+    bool isOnline;           // Trạng thái Online (< 120s)
+};
+
 enum MilesightModel {
     MS_MODEL_EM300_TH = 0, // Cảm biến Nhiệt độ / Độ ẩm chống nước
     MS_MODEL_EM500_CO2,    // Cảm biến Chất lượng môi trường / CO2
@@ -166,6 +193,10 @@ struct GatewayConfig {
     uint16_t wgEndpointPort;          // Cổng UDP (mặc định 51820)
     char     wgPeerPublicKey[45];     // Public key Server Base64 (44 chars + null)
 
+    // Cấu hình Gateway Mesh trong suốt (HC-Mesh)
+    bool     meshEnable;
+    uint8_t  meshRole;                // 0: Standalone, 1: Root, 2: Relay
+
     // Quản lý cảm biến Milesight
     uint8_t sensorCount;
     MilesightSensor sensors[MAX_MILESIGHT_SENSORS];
@@ -194,8 +225,14 @@ struct GatewayTelemetry {
     uint32_t txPktsCount;
     uint32_t fwdPktsCount;
     uint32_t dropPktsCount;
+    uint32_t meshRxCount;
+    uint32_t meshTxCount;
     int16_t  lastRSSI;
     float    lastSNR;
+
+    // Danh sách các trạm Relay trong mạng Mesh (Mesh Topology)
+    uint8_t  meshNodeCount;
+    MeshNodeInfo meshNodes[MAX_MESH_NODES];
 
     // Cảm biến phần cứng nội bộ & Nguồn
     float chipTempC;

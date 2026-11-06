@@ -329,6 +329,10 @@
                                         <td id="val-table-wg-status">Tắt</td>
                                     </tr>
                                     <tr>
+                                        <td>Chế độ Gateway Mesh</td>
+                                        <td id="val-table-mesh-status"><span class="badge badge-success">Root (Border Gateway)</span></td>
+                                    </tr>
+                                    <tr>
                                         <td>Định vị GPS (SIM A7680C)</td>
                                         <td id="val-table-gps-status"><span class="badge badge-secondary">Đang khởi động...</span></td>
                                     </tr>
@@ -362,6 +366,38 @@
                                         <tr>
                                             <td colspan="6" class="text-center text-muted">Đang đợi gói tin từ module E220-900T30D...</td>
                                         </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bảng Quản Lý Mạng Lưới Gateway Mesh -->
+                    <div class="card mt-4" id="card-mesh-topology">
+                        <div class="card-header">
+                            <div>
+                                <h3>Mạng Lưới Gateway Mesh & Chất Lượng Liên Kết P2P</h3>
+                                <div class="text-muted" style="font-size:12px; margin-top:2px;">Quản lý và giám sát các trạm Gateway Vệ Tinh (Relay) kết nối không dây P2P qua LoRa 1W</div>
+                            </div>
+                            <span class="metric-badge success" id="badge-mesh-count">1 Trạm Gốc (Root)</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Mã Gateway ID (EUI)</th>
+                                            <th>Vai trò mạng</th>
+                                            <th>Sóng LoRa P2P (RSSI / SNR)</th>
+                                            <th>Chất lượng kết nối</th>
+                                            <th>Số gói nhận</th>
+                                            <th>Nguồn cấp</th>
+                                            <th>Lần cuối thấy</th>
+                                            <th>Trạng thái</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="mesh-nodes-table-body">
+                                        <!-- Loaded by JS -->
                                     </tbody>
                                 </table>
                             </div>
@@ -795,6 +831,36 @@
                                     <label>Chu kỳ gửi Heartbeat Keepalive (Giây)</label>
                                     <input type="number" id="cfg-heartbeat-sec" class="form-control" value="60" min="10" max="3600">
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cấu hình Gateway Mesh Trong Suốt -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>Cấu hình Gateway Mesh Trong Suốt (HC-Mesh Protocol)</h3>
+                            <button class="btn btn-sm btn-primary" onclick="saveMeshConfig()">Lưu cấu hình Mesh</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert-box mb-4" style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px 16px; border-radius:6px; font-size:13px; line-height:1.5;">
+                                <strong>Cơ chế chuyển tiếp trong suốt (Transparent Mesh):</strong><br>
+                                • <strong>Root Gateway (Trạm Gốc):</strong> Có SIM 4G/LAN kết nối ChirpStack. Nhận gói Mesh từ các trạm Relay vệ tinh và đẩy thẳng lên ChirpStack dưới định danh chính xác của trạm đó.<br>
+                                • <strong>Relay Gateway (Trạm Vệ Tinh):</strong> Không cần SIM 4G, không cần Internet. Tự động thu gói từ cảm biến xung quanh và phát sóng LoRa 1W tầm xa (3-8km) về trạm Root.
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input type="checkbox" id="cfg-mesh-enable" checked>
+                                <label for="cfg-mesh-enable"><strong>Kích hoạt tính năng Gateway Mesh</strong></label>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Vai trò Gateway trong mạng Mesh (Mesh Role)</label>
+                                <select id="cfg-mesh-role" class="form-control">
+                                    <option value="1">Root Gateway (Trạm Gốc - Kết nối Internet & ChirpStack)</option>
+                                    <option value="2">Relay Gateway (Trạm Vệ Tinh - Không cần Internet, chuyển tiếp LoRa 1W)</option>
+                                    <option value="0">Standalone (Chế độ độc lập - Không dùng Mesh)</option>
+                                </select>
+                                <small class="text-muted">Chọn vai trò thích hợp theo kiến trúc triển khai thực địa.</small>
                             </div>
                         </div>
                     </div>

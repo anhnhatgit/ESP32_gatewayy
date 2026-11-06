@@ -80,7 +80,8 @@ function switchTab(tabId) {
 
     const titles = {
         'overview': 'Trạng thái tổng quan',
-        'wifi-setup': 'Cấu hình Wi-Fi & Mạng',
+        'wifi-setup': 'Cấu hình Wi-Fi & Mạng',
+
         'wireguard': 'Cấu hình WireGuard VPN Client',
         'lora-e220': 'Cấu hình Thu/Phát LoRa E220-900T30D',
         'mqtt-fwd': 'Cấu hình MQTT Forwarder',
@@ -156,26 +157,46 @@ async function fetchStatus() {
 
         // Forwarder Badges
         document.getElementById('val-mqtt-status').innerText = data.mqtt_enable ? (data.mqtt_connected ? 'Kết nối' : 'Đang nối...') : 'Tắt';
-        document.getElementById('val-udp-status').innerText = data.udp_enable ? 'Bật' : 'Tắt';
-
-        // WireGuard Status
-        if (document.getElementById('val-table-wg-status')) {
-            document.getElementById('val-table-wg-status').innerText = data.wg_enable ? (data.wg_connected ? 'Đang kết nối' : 'Đang chờ mạng...') : 'Tắt';
-        }
-        if (document.getElementById('disp-wg-status')) {
-            const wgEl = document.getElementById('disp-wg-status');
-            if (data.wg_enable) {
-                if (data.wg_connected) {
-                    wgEl.className = 'badge badge-success';
-                    wgEl.innerText = 'Đã kết nối (Tunnel UP)';
-                } else {
-                    wgEl.className = 'badge badge-warning';
-                    wgEl.innerText = 'Đang kết nối tới Máy chủ...';
-                }
-            } else {
-                wgEl.className = 'badge badge-secondary';
-                wgEl.innerText = 'Đã tắt';
-            }
+        document.getElementById('val-udp-status').innerText = data.udp_enable ? 'Bật' : 'Tắt';
+
+
+
+        // WireGuard Status
+
+        if (document.getElementById('val-table-wg-status')) {
+
+            document.getElementById('val-table-wg-status').innerText = data.wg_enable ? (data.wg_connected ? 'Đang kết nối' : 'Đang chờ mạng...') : 'Tắt';
+
+        }
+
+        if (document.getElementById('disp-wg-status')) {
+
+            const wgEl = document.getElementById('disp-wg-status');
+
+            if (data.wg_enable) {
+
+                if (data.wg_connected) {
+
+                    wgEl.className = 'badge badge-success';
+
+                    wgEl.innerText = 'Đã kết nối (Tunnel UP)';
+
+                } else {
+
+                    wgEl.className = 'badge badge-warning';
+
+                    wgEl.innerText = 'Đang kết nối tới Máy chủ...';
+
+                }
+
+            } else {
+
+                wgEl.className = 'badge badge-secondary';
+
+                wgEl.innerText = 'Đã tắt';
+
+            }
+
         }
 
         // Power Status
@@ -213,6 +234,17 @@ async function fetchStatus() {
         document.getElementById('val-table-ap-info').innerText = `${data.is_ap ? 'Phát sóng' : 'Tắt'} (192.168.4.1)`;
         document.getElementById('val-table-wifi-rssi').innerText = isStaConnected ? `${data.wifi_rssi} dBm` : 'N/A';
 
+        // Gateway Mesh Status
+        if (document.getElementById('val-table-mesh-status')) {
+            const roles = ["Standalone (Chuẩn)", "Root (Border Gateway)", "Relay (Trạm Vệ Tinh)"];
+            const badges = ["secondary", "success", "info"];
+            const roleIdx = (data.mesh_role !== undefined && data.mesh_role <= 2) ? data.mesh_role : 1;
+            const isMeshOn = data.mesh_enable !== false;
+            document.getElementById('val-table-mesh-status').innerHTML = isMeshOn ?
+                `<span class="badge badge-${badges[roleIdx]}">${roles[roleIdx]}</span>` :
+                `<span class="badge badge-secondary">Tắt Mesh</span>`;
+        }
+
         // GPS / GNSS Status
         if (document.getElementById('val-table-gps-status')) {
             const gpsEl = document.getElementById('val-table-gps-status');
@@ -232,6 +264,9 @@ async function fetchStatus() {
 
         // Render Live LoRa Packets
         renderLivePackets(data.live_packets);
+
+        // Render Mesh Topology Table
+        renderMeshTopology(data.mesh_nodes, g_gatewayEUI, data.mesh_role, data.mesh_enable);
     } catch (err) {
         console.warn('Status fetch error:', err);
     }
@@ -287,6 +322,133 @@ function renderLivePackets(packets) {
     tbody.innerHTML = html;
 }
 
+// 3b. RENDER MESH TOPOLOGY TABLE
+function renderMeshTopology(meshNodes, rootEui, meshRole, meshEnable) {
+    const tbody = document.getElementById('mesh-nodes-table-body');
+    const badgeCount = document.getElementById('badge-mesh-count');
+    if (!tbody) return;
+
+    // Determine current gateway role
+    const isRoot = (meshRole === 1 || meshRole === undefined);
+    const isRelay = (meshRole === 2);
+    const isStandalone = (meshRole === 0);
+
+    let html = '';
+    let totalNodes = 1; // Count root itself
+
+    // 1. First row: This Gateway itself
+    if (isRelay) {
+        html += `
+            <tr style="background-color: var(--primary-soft);">
+                <td><code>${rootEui}</code> <span style="color:var(--primary); font-size:11px; font-weight:600;">(Trạm này)</span></td>
+                <td><span class="badge badge-info">RELAY (Vệ tinh)</span></td>
+                <td><span class="text-muted">Chuyển tiếp P2P</span></td>
+                <td>
+                    <div class="link-meter-wrap">
+                        <div class="link-meter-bar"><div class="link-meter-fill" style="width:100%; background:var(--primary);"></div></div>
+                        <span style="font-size:11px; font-weight:600; color:var(--primary);">100%</span>
+                    </div>
+                </td>
+                <td>--</td>
+                <td>--</td>
+                <td>Vừa xong</td>
+                <td><span class="badge badge-success">Đang chuyển tiếp</span></td>
+            </tr>
+        `;
+    } else if (isStandalone) {
+        html += `
+            <tr>
+                <td><code>${rootEui}</code> <span style="color:var(--text-muted); font-size:11px;">(Trạm này)</span></td>
+                <td><span class="badge badge-secondary">STANDALONE (Độc lập)</span></td>
+                <td>--</td>
+                <td>--</td>
+                <td>--</td>
+                <td>--</td>
+                <td>--</td>
+                <td><span class="badge badge-secondary">Tắt Mesh</span></td>
+            </tr>
+        `;
+    } else {
+        // Root Gateway
+        html += `
+            <tr style="background-color: var(--primary-soft);">
+                <td><code>${rootEui}</code> <span style="color:var(--primary); font-size:11px; font-weight:600;">(Trạm này - Gốc)</span></td>
+                <td><span class="badge badge-success">ROOT (Trạm Gốc / Border)</span></td>
+                <td><span class="text-muted">Nội bộ (4G / LAN / WAN)</span></td>
+                <td>
+                    <div class="link-meter-wrap">
+                        <div class="link-meter-bar"><div class="link-meter-fill" style="width:100%; background:var(--success);"></div></div>
+                        <span style="font-size:11px; font-weight:600; color:var(--success);">100%</span>
+                    </div>
+                </td>
+                <td>--</td>
+                <td>--</td>
+                <td>Vừa xong</td>
+                <td><span class="badge badge-success">ChirpStack Uplink</span></td>
+            </tr>
+        `;
+    }
+
+    // 2. Subsequent rows: Relay nodes discovered
+    const pwrNames = ["--", "PoE 48V", "Battery", "DC 12V", "USB 5V"];
+    if (meshNodes && Array.isArray(meshNodes) && meshNodes.length > 0) {
+        meshNodes.forEach(node => {
+            totalNodes++;
+            const rssi = node.rssi || -99;
+            const snr = node.snr !== undefined ? node.snr : 0;
+            const pkts = node.pkts || 0;
+            const ago = node.ago_sec !== undefined ? node.ago_sec : 0;
+            const isOnline = node.online;
+
+            // Calculate link quality % based on RSSI (-120dBm = 5%, -60dBm or better = 100%)
+            let quality = Math.round(((rssi + 120) / 60) * 100);
+            if (quality < 5) quality = 5;
+            if (quality > 100) quality = 100;
+
+            let meterColor = 'var(--success)';
+            if (quality < 40) meterColor = 'var(--danger)';
+            else if (quality < 70) meterColor = 'var(--warning)';
+
+            const lastSeenStr = ago < 5 ? 'Vừa xong' : (ago < 60 ? `${ago}s trước` : `${Math.floor(ago / 60)}m ${ago % 60}s trước`);
+            const pwrStr = pwrNames[node.pwr] || '--';
+
+            html += `
+                <tr>
+                    <td><code>${node.eui}</code></td>
+                    <td><span class="badge badge-info">RELAY (Vệ tinh)</span></td>
+                    <td><strong>${rssi} dBm</strong> / ${snr.toFixed(1)} dB</td>
+                    <td>
+                        <div class="link-meter-wrap">
+                            <div class="link-meter-bar"><div class="link-meter-fill" style="width:${quality}%; background:${meterColor};"></div></div>
+                            <span style="font-size:11px; font-weight:600;">${quality}%</span>
+                        </div>
+                    </td>
+                    <td><strong>${pkts.toLocaleString()}</strong> gói</td>
+                    <td><span class="badge badge-secondary">${pwrStr}</span></td>
+                    <td>${lastSeenStr}</td>
+                    <td>
+                        ${isOnline ? 
+                            '<span class="badge badge-success">Online (Liên kết tốt)</span>' : 
+                            '<span class="badge badge-danger">Mất kết nối (>2m)</span>'}
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    tbody.innerHTML = html;
+    if (badgeCount) {
+        if (!isRoot) {
+            badgeCount.innerText = isRelay ? 'Chế độ Relay' : 'Chế độ Standalone';
+            badgeCount.className = 'metric-badge info';
+        } else {
+            const relayCount = (meshNodes && Array.isArray(meshNodes)) ? meshNodes.length : 0;
+            badgeCount.innerText = `${totalNodes} Trạm (${relayCount} Vệ Tinh kết nối)`;
+            badgeCount.className = 'metric-badge success';
+        }
+    }
+}
+
 // 4. LOAD CONFIGURATION FROM GATEWAY NVS
 async function loadConfig() {
     try {
@@ -340,18 +502,35 @@ async function loadConfig() {
         document.getElementById('cfg-udp-enable').checked = cfg.udpEnable !== undefined ? cfg.udpEnable : true;
         if (cfg.serverAddress) document.getElementById('cfg-server-addr').value = cfg.serverAddress;
         if (cfg.serverPort) document.getElementById('cfg-server-port').value = cfg.serverPort;
-        if (cfg.heartbeatIntervalSec) document.getElementById('cfg-heartbeat-sec').value = cfg.heartbeatIntervalSec;
-
-        // WireGuard VPN
-        if (document.getElementById('cfg-wg-enable')) {
-            document.getElementById('cfg-wg-enable').checked = cfg.wgEnable || false;
-            document.getElementById('cfg-wg-local-ip').value = cfg.wgLocalIP || '10.0.0.2';
-            document.getElementById('cfg-wg-subnet').value = cfg.wgSubnetMask || '255.255.255.0';
-            document.getElementById('cfg-wg-gateway').value = cfg.wgGateway || '10.0.0.1';
-            document.getElementById('cfg-wg-endpoint').value = cfg.wgEndpointAddress || '';
-            document.getElementById('cfg-wg-port').value = cfg.wgEndpointPort || 51820;
-            document.getElementById('cfg-wg-private-key').value = cfg.wgPrivateKey || '';
-            document.getElementById('cfg-wg-peer-public-key').value = cfg.wgPeerPublicKey || '';
+        if (cfg.heartbeatIntervalSec) document.getElementById('cfg-heartbeat-sec').value = cfg.heartbeatIntervalSec;
+
+
+
+        // WireGuard VPN
+
+        if (document.getElementById('cfg-wg-enable')) {
+
+            document.getElementById('cfg-wg-enable').checked = cfg.wgEnable || false;
+
+            document.getElementById('cfg-wg-local-ip').value = cfg.wgLocalIP || '10.0.0.2';
+
+            document.getElementById('cfg-wg-subnet').value = cfg.wgSubnetMask || '255.255.255.0';
+
+            document.getElementById('cfg-wg-gateway').value = cfg.wgGateway || '10.0.0.1';
+
+            document.getElementById('cfg-wg-endpoint').value = cfg.wgEndpointAddress || '';
+
+            document.getElementById('cfg-wg-port').value = cfg.wgEndpointPort || 51820;
+
+            document.getElementById('cfg-wg-private-key').value = cfg.wgPrivateKey || '';
+
+            document.getElementById('cfg-wg-peer-public-key').value = cfg.wgPeerPublicKey || '';
+
+        }
+        // Gateway Mesh
+        if (document.getElementById('cfg-mesh-enable')) {
+            document.getElementById('cfg-mesh-enable').checked = (cfg.meshEnable !== undefined) ? cfg.meshEnable : true;
+            document.getElementById('cfg-mesh-role').value = (cfg.meshRole !== undefined) ? cfg.meshRole : 1;
         }
     } catch (err) {
         console.warn('Config load error:', err);
@@ -674,6 +853,29 @@ async function saveUdpConfig() {
     }
 }
 
+// 9.2. GATEWAY MESH CONFIGURATION
+async function saveMeshConfig() {
+    const payload = {
+        meshEnable: document.getElementById('cfg-mesh-enable').checked,
+        meshRole: parseInt(document.getElementById('cfg-mesh-role').value)
+    };
+    try {
+        const res = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            showToast('Đã lưu cấu hình Gateway Mesh thành công!', 'success');
+            fetchStatus();
+        } else {
+            showToast('Lỗi lưu cấu hình Mesh', 'error');
+        }
+    } catch (err) {
+        showToast('Lỗi kết nối: ' + err.message, 'error');
+    }
+}
+
 // 10. SENSORS MANAGEMENT
 async function loadSensors() {
     try {
@@ -956,35 +1158,67 @@ function initApp() {
 window.addEventListener('DOMContentLoaded', () => {
     checkAuth();
 });
-
-
-// WIREGUARD VPN CONFIG SAVE
-async function saveWireGuardConfig() {
-    const payload = {
-        wgEnable: document.getElementById('cfg-wg-enable').checked,
-        wgLocalIP: document.getElementById('cfg-wg-local-ip').value.trim(),
-        wgSubnetMask: document.getElementById('cfg-wg-subnet').value.trim(),
-        wgGateway: document.getElementById('cfg-wg-gateway').value.trim(),
-        wgEndpointAddress: document.getElementById('cfg-wg-endpoint').value.trim(),
-        wgEndpointPort: parseInt(document.getElementById('cfg-wg-port').value) || 51820,
-        wgPrivateKey: document.getElementById('cfg-wg-private-key').value.trim(),
-        wgPeerPublicKey: document.getElementById('cfg-wg-peer-public-key').value.trim()
-    };
-
-    try {
-        const res = await fetch('/api/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showToast('Đã lưu cấu hình WireGuard VPN thành công!', 'success');
-            fetchStatus();
-        } else {
-            showToast('Lỗi: ' + (data.error || 'Không thể lưu cấu hình'), 'danger');
-        }
-    } catch (err) {
-        showToast('Lỗi kết nối: ' + err.message, 'danger');
-    }
-}
+
+
+
+
+// WIREGUARD VPN CONFIG SAVE
+
+async function saveWireGuardConfig() {
+
+    const payload = {
+
+        wgEnable: document.getElementById('cfg-wg-enable').checked,
+
+        wgLocalIP: document.getElementById('cfg-wg-local-ip').value.trim(),
+
+        wgSubnetMask: document.getElementById('cfg-wg-subnet').value.trim(),
+
+        wgGateway: document.getElementById('cfg-wg-gateway').value.trim(),
+
+        wgEndpointAddress: document.getElementById('cfg-wg-endpoint').value.trim(),
+
+        wgEndpointPort: parseInt(document.getElementById('cfg-wg-port').value) || 51820,
+
+        wgPrivateKey: document.getElementById('cfg-wg-private-key').value.trim(),
+
+        wgPeerPublicKey: document.getElementById('cfg-wg-peer-public-key').value.trim()
+
+    };
+
+
+
+    try {
+
+        const res = await fetch('/api/config', {
+
+            method: 'POST',
+
+            headers: { 'Content-Type': 'application/json' },
+
+            body: JSON.stringify(payload)
+
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+
+            showToast('Đã lưu cấu hình WireGuard VPN thành công!', 'success');
+
+            fetchStatus();
+
+        } else {
+
+            showToast('Lỗi: ' + (data.error || 'Không thể lưu cấu hình'), 'danger');
+
+        }
+
+    } catch (err) {
+
+        showToast('Lỗi kết nối: ' + err.message, 'danger');
+
+    }
+
+}
+
