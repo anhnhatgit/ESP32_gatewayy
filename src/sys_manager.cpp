@@ -395,7 +395,7 @@ void SystemManager_Init() {
 
     memset(&g_telemetry, 0, sizeof(GatewayTelemetry));
     g_telemetry.netState = NET_DISCONNECTED;
-    g_telemetry.currentPowerSource = PWR_POE;
+    g_telemetry.currentPowerSource = PWR_USB_5V;
 
     SystemManager_LoadConfig();
     Serial.printf("[SYS] Gateway EUI : %s\n", g_config.gatewayEUI);

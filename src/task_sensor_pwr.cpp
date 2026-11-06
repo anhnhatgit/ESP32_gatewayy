@@ -24,14 +24,16 @@ void Task_Sensor_Power(void *pvParameters) {
         float vPoe = (rawPoe / 4095.0f) * 3.3f * 15.0f;
         float vBat = (rawBat / 4095.0f) * 3.3f * 2.0f;
 
-        // Xac dinh nguon cap hien tai
-        PowerSource pwrSrc = PWR_UNKNOWN;
+        // Xac dinh nguon cap hien tai (Kit TDM2402 cap nguon mac dinh qua cong USB Type-C 5V)
+        PowerSource pwrSrc = PWR_USB_5V;
         if (vPoe > 30.0f) {
             pwrSrc = PWR_POE;
         } else if (vBat > 3.0f) {
             pwrSrc = PWR_BATTERY;
-        } else {
+        } else if (vPoe > 8.0f) {
             pwrSrc = PWR_DC_JACK;
+        } else {
+            pwrSrc = PWR_USB_5V;
         }
 
         // 3. Cap nhat Telemetry truc tiep khong ton bo nho stack

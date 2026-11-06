@@ -43,7 +43,8 @@ enum PowerSource {
     PWR_UNKNOWN = 0,
     PWR_POE,       // Cấp nguồn qua cáp mạng PoE 48V
     PWR_BATTERY,   // Nguồn Pin dự phòng Lithium 3.7V - 4.2V
-    PWR_DC_JACK    // Cắm nguồn DC Adapter 12V/5V
+    PWR_DC_JACK,   // Cắm nguồn DC Adapter 12V
+    PWR_USB_5V     // Cấp nguồn qua cổng USB Type-C (5V) / Header +5V
 };
 
 enum MilesightModel {

@@ -179,9 +179,9 @@ async function fetchStatus() {
         }
 
         // Power Status
-        const pwrLabels = ["Không rõ", "PoE 48V Active", "Pin dự phòng (Battery)", "Nguồn DC 12V"];
-        const pwrSrc = data.power_src || 1;
-        document.getElementById('val-pwr-source').innerText = pwrLabels[pwrSrc] || "PoE Active";
+        const pwrLabels = ["Không rõ", "PoE 48V Active", "Pin dự phòng (Battery)", "Nguồn DC Adapter 12V", "USB Type-C (5V)"];
+        const pwrSrc = (data.power_src !== undefined && data.power_src !== null) ? data.power_src : 4;
+        document.getElementById('val-pwr-source').innerText = pwrLabels[pwrSrc] || "USB Type-C (5V)";
         if (pwrSrc === 1) {
             document.getElementById('badge-pwr').innerText = "PoE 48V";
             document.getElementById('badge-pwr').className = "metric-badge success";
@@ -190,10 +190,14 @@ async function fetchStatus() {
             document.getElementById('badge-pwr').innerText = "Battery";
             document.getElementById('badge-pwr').className = "metric-badge warning";
             document.getElementById('val-pwr-detail').innerText = `Điện áp Pin: ${(data.bat_v || 3.7).toFixed(2)} V`;
-        } else {
+        } else if (pwrSrc === 3) {
             document.getElementById('badge-pwr').innerText = "DC 12V";
             document.getElementById('badge-pwr').className = "metric-badge info";
-            document.getElementById('val-pwr-detail').innerText = `Nguồn cấp trực tiếp`;
+            document.getElementById('val-pwr-detail').innerText = `Nguồn Adapter DC 12V`;
+        } else {
+            document.getElementById('badge-pwr').innerText = "USB 5V";
+            document.getElementById('badge-pwr').className = "metric-badge info";
+            document.getElementById('val-pwr-detail').innerText = `Cổng USB Type-C (5.0V)`;
         }
 
         // Temp & Heap
